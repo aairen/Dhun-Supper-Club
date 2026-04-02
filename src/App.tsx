@@ -1,5 +1,5 @@
 import React from "react";
-import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./components/AuthProvider";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -28,6 +28,29 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
 };
 
 function AppRoutes() {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    const path = location.pathname;
+    let title = "Dhun Supper Club";
+
+    if (path === "/") title += " | Home";
+    else if (path === "/events") title += " | Events";
+    else if (path.startsWith("/booking/")) title += " | Booking";
+    else if (path.startsWith("/reservation/")) title += " | Reservation";
+    else if (path === "/dashboard") title += " | Dashboard";
+    else if (path === "/auth") title += " | Sign In";
+    else if (path === "/about") title += " | About";
+    else if (path === "/contact") title += " | Contact";
+    else if (path === "/buy-credits") title += " | Buy Credits";
+    else if (path === "/settings") title += " | Settings";
+    else if (path.startsWith("/admin")) title += " | Admin";
+    else if (path === "/forgot-password") title += " | Forgot Password";
+    else if (path === "/reset-password") title += " | Reset Password";
+
+    document.title = title;
+  }, [location]);
+
   return (
     <div className="flex flex-col min-h-screen bg-neutral-50 text-neutral-900 font-sans">
       <Navbar />
