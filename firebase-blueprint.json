@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and credit balance information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "credits": { "type": "number", "description": "Current credit balance." },
+        "role": { "type": "string", "enum": ["user", "admin", "member"] },
+        "membershipProgress": { "type": "number", "description": "Credits spent in current calendar year." },
+        "membershipYear": { "type": "number", "description": "Year for which membership status is valid." }
+      },
+      "required": ["uid", "email", "credits", "role"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Dining event details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dateTime": { "type": "string", "format": "date-time" },
+        "capacity": { "type": "number" },
+        "type": { "type": "string", "enum": ["thali", "curated"] },
+        "creditsPerPerson": { "type": "number" }
+      },
+      "required": ["title", "dateTime", "capacity", "type", "creditsPerPerson"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Reservation for an event.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "numPeople": { "type": "number" },
+        "totalCredits": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "eventId", "numPeople", "totalCredits", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Record of credit purchases or usage.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number", "description": "USD amount for purchases, 0 for others." },
+        "creditsIssued": { "type": "number" },
+        "type": { "type": "string", "enum": ["purchase", "booking", "cancellation"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "creditsIssued", "type", "timestamp"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Editorial content for the supper club.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "author": { "type": "string" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["draft", "published"] }
+      },
+      "required": ["title", "content", "status"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Contact messages from users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "body": { "type": "string" },
+        "status": { "type": "string", "enum": ["unread", "read", "responded"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["subject", "body", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles." },
+    "/events/{eventId}": { "schema": "Event", "description": "Dining events." },
+    "/bookings/{bookingId}": { "schema": "Booking", "description": "Event reservations." },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Credit transactions." },
+    "/blogPosts/{postId}": { "schema": "BlogPost", "description": "Blog articles." },
+    "/messages/{messageId}": { "schema": "Message", "description": "Contact messages." }
+  }
+}

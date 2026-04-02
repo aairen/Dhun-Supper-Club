@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // Fields: uid, email, firstName, lastName, credits, role, membershipProgress, membershipYear
+    //
+    // Collection: events
+    // Fields: title, description, dateTime, capacity, type, creditsPerPerson
+    //
+    // Collection: bookings
+    // Fields: userId, eventId, numPeople, totalCredits, createdAt
+    //
+    // Collection: transactions
+    // Fields: userId, amount, creditsIssued, type, timestamp
+    //
+    // Collection: blogPosts
+    // Fields: title, content, author, publishedAt, status
+    //
+    // Collection: messages
+    // Fields: userId, subject, body, status, createdAt
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        ( (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email == "airenarjun6@gmail.com" && request.auth.token.email_verified == true));
+    }
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'credits', 'role']) &&
+             data.credits is number &&
+             data.role in ['user', 'admin', 'member'] &&
+             data.email is string &&
+             (!('firstName' in data) || data.firstName is string) &&
+             (!('lastName' in data) || data.lastName is string) &&
+             (!('membershipProgress' in data) || data.membershipProgress is number) &&
+             (!('membershipYear' in data) || data.membershipYear is number) &&
+             (!('notificationPrefs' in data) || data.notificationPrefs is map) &&
+             (!('testResetDone' in data) || data.testResetDone is bool);
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['title', 'dateTime', 'capacity', 'type', 'creditsPerPerson']) &&
+             data.capacity is number && data.creditsPerPerson is number &&
+             data.title is string && data.type in ['thali', 'curated', 'brunch'] &&
+             (!('bookedSeats' in data) || data.bookedSeats is number) &&
+             (!('description' in data) || data.description is string);
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['userId', 'eventId', 'numPeople', 'totalCredits', 'createdAt']) &&
+             data.numPeople is number && data.totalCredits is number &&
+             data.userId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && isValidEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidBooking(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin()) && isValidBooking(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+    
+    match /blogPosts/{postId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    match /messages/{messageId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow create: if true; // Allow anyone to send message
+      allow update, delete: if isAdmin();
+    }
+  }
+}
