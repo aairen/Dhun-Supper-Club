@@ -35,8 +35,8 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        ( (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-         (request.auth.token.email == "airenarjun6@gmail.com" && request.auth.token.email_verified == true));
+             (request.auth.token.role == 'admin' || 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
     
     function isValidUser(data) {
@@ -71,15 +71,19 @@ service cloud.firestore {
     // ===============================================================
     
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAdmin();
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
-      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])) || 
+        isAdmin()
+      ) && isValidUser(request.resource.data);
       allow delete: if isOwner(userId) || isAdmin();
     }
     
     match /events/{eventId} {
       allow read: if true;
-      allow create, update: if isAuthenticated() && isValidEvent(request.resource.data);
+      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
       allow delete: if isAdmin();
     }
     
@@ -103,7 +107,9 @@ service cloud.firestore {
     
     match /messages/{messageId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
-      allow create: if true; // Allow anyone to send message
+      allow create: if isAuthenticated() && 
+                    request.resource.data.body.size() < 5000 && 
+                    request.resource.data.subject.size() < 500;
       allow update, delete: if isAdmin();
     }
   }

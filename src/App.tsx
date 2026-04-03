@@ -9,6 +9,7 @@ import Booking from "./pages/Booking";
 import ReservationDetails from "./pages/ReservationDetails";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
+import AdminRoute from "./components/AdminRoute";
 import AuthPage from "./pages/Auth";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
@@ -26,6 +27,7 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
 
   return <>{children}</>;
 };
+
 
 function AppRoutes() {
   const location = useLocation();
@@ -96,9 +98,9 @@ function AppRoutes() {
           } />
           
           <Route path="/admin/*" element={
-            <ProtectedRoute adminOnly>
+            <AdminRoute>
               <Admin />
-            </ProtectedRoute>
+            </AdminRoute>
           } />
         </Routes>
       </main>

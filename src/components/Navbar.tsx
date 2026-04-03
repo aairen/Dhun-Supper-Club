@@ -11,8 +11,20 @@ const Navbar = () => {
   const { user, profile, isAdmin } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+  const profileRef = React.useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -64,57 +76,62 @@ const Navbar = () => {
             )}
 
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center space-x-2 text-sm font-medium text-neutral-900 hover:text-neutral-600 transition-colors"
                 >
-                  <span>Hello, {profile?.firstName || "User"}</span>
+                  <div className="flex flex-col items-end">
+                    <span>Hello, {profile?.firstName || "User"}</span>
+                    {isAdmin && <span className="text-[10px] text-red-600 font-bold uppercase tracking-tighter">Admin</span>}
+                  </div>
                   <User className="w-4 h-4" />
                 </button>
 
                 <AnimatePresence>
                   {isProfileOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-xl py-2"
-                    >
-                      <Link
-                        to="/dashboard"
-                        className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                        onClick={() => setIsProfileOpen(false)}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-xl py-2"
                       >
-                        <LayoutDashboard className="w-4 h-4 mr-2" />
-                        Dashboard
-                      </Link>
-                      <Link
-                        to="/settings"
-                        className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <Settings className="w-4 h-4 mr-2" />
-                        Settings
-                      </Link>
-                      {isAdmin && (
+                        {!isAdmin && (
+                          <Link
+                            to="/dashboard"
+                            className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            <LayoutDashboard className="w-4 h-4 mr-2" />
+                            Dashboard
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Admin
+                          </Link>
+                        )}
                         <Link
-                          to="/admin"
+                          to="/settings"
                           className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <Settings className="w-4 h-4 mr-2" />
-                          Admin
+                          Settings
                         </Link>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-neutral-50"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Logout
-                      </button>
-                    </motion.div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-neutral-50"
+                        >
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Logout
+                        </button>
+                      </motion.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -182,20 +199,15 @@ const Navbar = () => {
                   </div>
 
                   <div className="space-y-6">
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setIsOpen(false)}
-                      className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/settings"
-                      onClick={() => setIsOpen(false)}
-                      className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
-                    >
-                      Settings
-                    </Link>
+                    {!isAdmin && (
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setIsOpen(false)}
+                        className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
+                      >
+                        Dashboard
+                      </Link>
+                    )}
                     {isAdmin && (
                       <Link
                         to="/admin"
@@ -205,6 +217,13 @@ const Navbar = () => {
                         Admin
                       </Link>
                     )}
+                    <Link
+                      to="/settings"
+                      onClick={() => setIsOpen(false)}
+                      className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
+                    >
+                      Settings
+                    </Link>
                     <button
                       onClick={() => {
                         handleLogout();

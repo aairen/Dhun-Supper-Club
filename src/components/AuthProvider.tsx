@@ -79,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             setProfile(data);
+            console.log("Profile updated:", data.uid, "Role:", data.role);
           }
           setLoading(false);
         }, (error) => {

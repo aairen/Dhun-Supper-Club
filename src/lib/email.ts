@@ -1,3 +1,5 @@
+import { auth } from "../firebase";
+
 export interface EmailParams {
   to: string;
   subject: string;
@@ -8,10 +10,18 @@ export interface EmailParams {
 export async function sendEmail(params: EmailParams) {
   console.log(`[FRONTEND EMAIL ATTEMPT] To: ${params.to}, Type: ${params.type}`);
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User must be authenticated to send emails");
+    }
+
+    const idToken = await user.getIdToken();
+
     const response = await fetch("/api/send-email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`,
       },
       body: JSON.stringify(params),
     });

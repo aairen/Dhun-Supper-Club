@@ -11,8 +11,14 @@ import { cn } from "../lib/utils";
 import { generateAutoEvents } from "../lib/eventUtils";
 
 const Dashboard = () => {
-  const { profile, user } = useAuth();
+  const { profile, user, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigate("/admin", { replace: true });
+    }
+  }, [isAdmin, navigate]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);

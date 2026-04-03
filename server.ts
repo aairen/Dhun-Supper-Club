@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import dotenv from "dotenv";
@@ -58,17 +59,43 @@ let db: any = null;
 
 async function getDb() {
   if (!db) {
-    const firebaseConfig = JSON.parse(
-      await import("fs/promises").then((fs) => fs.readFile("./firebase-applet-config.json", "utf-8"))
-    );
-
-    if (!adminApp) {
-      adminApp = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId: firebaseConfig.projectId,
-      });
+    let projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
+    let databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
+    
+    // Fallback to config file if env vars are missing
+    try {
+      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+      const config = JSON.parse(await fs.promises.readFile(configPath, "utf-8"));
+      if (!projectId) projectId = config.projectId;
+      if (databaseId === "(default)") databaseId = config.firestoreDatabaseId || "(default)";
+      console.log("[FIREBASE ADMIN] Loaded config from firebase-applet-config.json");
+    } catch (err) {
+      // Ignore if file doesn't exist
     }
-    db = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+    
+    if (!projectId) {
+      console.error("[FIREBASE ADMIN] CRITICAL: Project ID is missing!");
+    }
+    
+    console.log(`[FIREBASE ADMIN] Initializing with Project: ${projectId}, Database: ${databaseId}`);
+    
+    try {
+      if (!adminApp) {
+        adminApp = admin.initializeApp({
+          credential: admin.credential.applicationDefault(),
+          projectId: projectId,
+        });
+      }
+      // For firebase-admin, getFirestore can take the app and databaseId
+      db = getFirestore(adminApp, databaseId);
+      
+      // Test connectivity
+      await db.collection("health").doc("check").set({ lastCheck: new Date().toISOString() }, { merge: true });
+      console.log("[FIREBASE ADMIN] Connectivity test successful");
+    } catch (err) {
+      console.error("[FIREBASE ADMIN] Initialization/Connectivity error:", err);
+      throw err;
+    }
   }
   return db;
 }
@@ -172,11 +199,17 @@ async function startServer() {
     const sig = req.headers["stripe-signature"] as string;
     let event;
 
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("STRIPE_WEBHOOK_SECRET is not set");
+      return res.status(500).json({ error: "Webhook secret not configured" });
+    }
+
     try {
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
-        process.env.STRIPE_WEBHOOK_SECRET || ""
+        webhookSecret
       );
     } catch (err: any) {
       console.error(`Webhook Error: ${err.message}`);
@@ -193,28 +226,43 @@ async function startServer() {
           const userRef = db.collection("users").doc(userId);
           const totalCredits = parseInt(credits) + (parseInt(bonus || "0"));
 
-          await db.runTransaction(async (transaction: any) => {
-            const uSnap = await transaction.get(userRef);
-            if (!uSnap.exists) throw new Error("User not found");
-            
-            const currentCredits = uSnap.data().credits || 0;
-            transaction.update(userRef, {
-              credits: currentCredits + totalCredits
+          // Check if this session has already been processed to avoid double-crediting
+          const processedRef = db.collection("processed_sessions").doc(session.id);
+          const processedSnap = await processedRef.get();
+
+          if (!processedSnap.exists) {
+            await db.runTransaction(async (transaction: any) => {
+              const uSnap = await transaction.get(userRef);
+              if (!uSnap.exists) throw new Error("User not found");
+              
+              const currentCredits = uSnap.data().credits || 0;
+              transaction.update(userRef, {
+                credits: currentCredits + totalCredits
+              });
+
+              // Mark session as processed
+              transaction.set(processedRef, {
+                processedAt: admin.firestore.FieldValue.serverTimestamp(),
+                userId,
+                totalCredits
+              });
+
+              // Log transaction
+              const transRef = db.collection("transactions").doc();
+              transaction.set(transRef, {
+                userId,
+                amount: session.amount_total ? session.amount_total / 100 : 0,
+                creditsIssued: totalCredits,
+                type: "purchase",
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                stripeSessionId: session.id
+              });
             });
 
-            // Log transaction
-            const transRef = db.collection("transactions").doc();
-            transaction.set(transRef, {
-              userId,
-              amount: session.amount_total ? session.amount_total / 100 : 0,
-              creditsIssued: totalCredits,
-              type: "purchase",
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              stripeSessionId: session.id
-            });
-          });
-
-          console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
+            console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
+          } else {
+            console.log(`[STRIPE WEBHOOK] Session ${session.id} already processed`);
+          }
         } catch (error) {
           console.error("Error updating user credits from webhook:", error);
         }
@@ -231,6 +279,18 @@ async function startServer() {
 
   // Send Email Route
   app.post("/api/send-email", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
     const { to, subject, body, type } = req.body;
     const result = await sendEmailHelper({ to, subject, body, type });
     if (result.success) {
@@ -242,6 +302,11 @@ async function startServer() {
 
   // Reminder Cron Route
   app.post("/api/cron/reminders", async (req, res) => {
+    const cronSecret = req.headers["x-cron-secret"];
+    if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     try {
       const db = await getDb();
       const now = new Date();
@@ -467,6 +532,131 @@ async function startServer() {
   };
 
   startReminderJob();
+
+  // Admin API: Set User Role
+  app.post("/api/admin/set-role", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const db = await getDb();
+      
+      // Verify caller is admin
+      const callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const { targetUid, role } = req.body;
+      if (!targetUid || !role) {
+        return res.status(400).json({ error: "Target UID and role are required" });
+      }
+
+      const targetRef = db.collection("users").doc(targetUid);
+      const targetSnap = await targetRef.get();
+      if (!targetSnap.exists) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      await targetRef.update({ role });
+      
+      // Set custom claims for the user
+      await admin.auth().setCustomUserClaims(targetUid, { role });
+      
+      res.json({ success: true, message: `User role updated to ${role} (including custom claims)` });
+    } catch (error: any) {
+      console.error("Admin set-role error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin API: Cancel Booking
+  app.post("/api/admin/cancel-booking", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const db = await getDb();
+      
+      console.log(`[ADMIN CANCEL] Caller: ${decodedToken.uid}, Booking: ${req.body.bookingId}`);
+
+      // Verify caller is admin
+      const callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      if (!callerSnap.exists) {
+        console.error(`[ADMIN CANCEL] Caller profile not found: ${decodedToken.uid}`);
+        return res.status(403).json({ error: "Forbidden: User profile not found" });
+      }
+      
+      if (callerSnap.data().role !== "admin") {
+        console.error(`[ADMIN CANCEL] Caller is not an admin: ${decodedToken.uid}, Role: ${callerSnap.data().role}`);
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const { bookingId } = req.body;
+      if (!bookingId) {
+        return res.status(400).json({ error: "Booking ID is required" });
+      }
+
+      const bookingRef = db.collection("bookings").doc(bookingId);
+      const bookingSnap = await bookingRef.get();
+      if (!bookingSnap.exists) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
+
+      const bookingData = bookingSnap.data();
+      const userRef = db.collection("users").doc(bookingData.userId);
+      const eventRef = db.collection("events").doc(bookingData.eventId);
+
+      await db.runTransaction(async (transaction: any) => {
+        const uSnap = await transaction.get(userRef);
+        const eSnap = await transaction.get(eventRef);
+        
+        if (!uSnap.exists) throw new Error("User not found");
+        
+        // 1. Delete booking
+        transaction.delete(bookingRef);
+        
+        // 2. Refund credits
+        const currentCredits = uSnap.data().credits || 0;
+        transaction.update(userRef, {
+          credits: currentCredits + bookingData.totalCredits
+        });
+
+        // 3. Update event booked seats
+        if (eSnap.exists) {
+          const currentBooked = eSnap.data().bookedSeats || 0;
+          transaction.update(eventRef, {
+            bookedSeats: Math.max(0, currentBooked - bookingData.numPeople)
+          });
+        }
+
+        // 4. Log refund transaction
+        const transRef = db.collection("transactions").doc();
+        transaction.set(transRef, {
+          userId: bookingData.userId,
+          amount: 0,
+          creditsIssued: bookingData.totalCredits,
+          type: "refund",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          bookingId: bookingId,
+          eventId: bookingData.eventId
+        });
+      });
+
+      res.json({ success: true, message: "Booking cancelled and credits refunded" });
+    } catch (error: any) {
+      console.error("Admin cancel-booking error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

@@ -117,7 +117,7 @@ const BuyCredits = () => {
                     }}
                     onBlur={() => {
                       if (credits === "" || (typeof credits === 'number' && credits < 1)) {
-                        setCredits(5);
+                        setCredits(1);
                       }
                     }}
                     className="w-16 md:w-20 text-3xl md:text-4xl font-serif text-neutral-900 bg-transparent text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -193,7 +193,7 @@ const BuyCredits = () => {
                   <span className="text-neutral-900">${total.toFixed(2)}</span>
                 </div>
                 <p className="mt-1 text-[10px] text-neutral-400 uppercase tracking-widest text-right">
-                  Total credits received: {Number(credits) + bonusCredits}
+                  Total credits: {Number(credits) + bonusCredits}
                 </p>
               </div>
 
