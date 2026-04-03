@@ -7,7 +7,7 @@ const Home = () => {
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative h-[90vh] flex items-center justify-center overflow-hidden bg-neutral-900">
+      <section className="relative h-[80vh] md:h-[90vh] flex items-center justify-center overflow-hidden bg-neutral-900">
         <div className="absolute inset-0 z-0">
           <img 
             src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=2070" 
@@ -17,23 +17,22 @@ const Home = () => {
           />
         </div>
         
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-5xl md:text-7xl font-serif text-white tracking-widest uppercase mb-6"
+            className="text-6xl sm:text-7xl md:text-9xl font-serif text-white tracking-tighter mb-2"
           >
-            Dhun Supper Club
+            Dhun
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg md:text-xl text-neutral-300 font-light tracking-wide mb-10 max-w-2xl mx-auto leading-relaxed"
+            className="text-base sm:text-lg md:text-2xl text-neutral-300 font-light uppercase tracking-[0.2em] md:tracking-[0.3em] mb-10 max-w-2xl mx-auto leading-relaxed"
           >
-            An exclusive culinary sanctuary where tradition meets modern elegance. 
-            Curated dining experiences designed for the discerning palate.
+            Supper Club
           </motion.p>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -42,7 +41,7 @@ const Home = () => {
           >
             <Link 
               to="/events" 
-              className="inline-flex items-center bg-white text-neutral-900 px-10 py-4 text-sm font-semibold uppercase tracking-widest hover:bg-neutral-100 transition-all group"
+              className="inline-flex items-center bg-white text-neutral-900 px-8 md:px-10 py-4 text-sm font-semibold uppercase tracking-widest hover:bg-neutral-100 transition-all group"
             >
               Book an Event
               <ArrowRight className="ml-3 w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -52,7 +51,7 @@ const Home = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-neutral-50">
+      <section className="py-16 md:py-24 bg-neutral-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
             <div className="flex flex-col items-center">
@@ -60,7 +59,7 @@ const Home = () => {
                 <Calendar className="w-6 h-6 text-neutral-900" />
               </div>
               <h5 className="text-lg font-serif mb-3 uppercase tracking-widest">Seamless Booking</h5>
-              <p className="text-sm text-neutral-500 font-light leading-relaxed">
+              <p className="text-sm text-neutral-500 font-light leading-relaxed max-w-xs">
                 Our intuitive credit-based system allows you to secure your seat with a single click.
               </p>
             </div>
@@ -69,7 +68,7 @@ const Home = () => {
                 <Users className="w-6 h-6 text-neutral-900" />
               </div>
               <h5 className="text-lg font-serif mb-3 uppercase tracking-widest">Intimate Gatherings</h5>
-              <p className="text-sm text-neutral-500 font-light leading-relaxed">
+              <p className="text-sm text-neutral-500 font-light leading-relaxed max-w-xs">
                 Limited capacity events ensure a personalized and communal atmosphere for every guest.
               </p>
             </div>
@@ -78,7 +77,7 @@ const Home = () => {
                 <Star className="w-6 h-6 text-neutral-900" />
               </div>
               <h5 className="text-lg font-serif mb-3 uppercase tracking-widest">Membership Rewards</h5>
-              <p className="text-sm text-neutral-500 font-light leading-relaxed">
+              <p className="text-sm text-neutral-500 font-light leading-relaxed max-w-xs">
                 Frequent diners earn exclusive status and priority access to our most sought-after events.
               </p>
             </div>
@@ -87,11 +86,11 @@ const Home = () => {
       </section>
 
       {/* Experiences Section */}
-      <section className="py-24 bg-white">
+      <section className="py-16 md:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400 mb-4">The Collection</h2>
-            <h3 className="text-4xl font-serif text-neutral-900 uppercase tracking-widest">Experiences at Dhun</h3>
+          <div className="text-center mb-16 md:mb-20">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-400 mb-4">The Collection</h2>
+            <h3 className="text-3xl md:text-4xl font-serif text-neutral-900 uppercase tracking-widest">Experiences at Dhun</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
@@ -149,7 +148,7 @@ const Home = () => {
               </div>
             </motion.div>
 
-            {/* Curated Collection */}
+            {/* Curated Dining */}
             <motion.div 
               whileHover={{ y: -10 }}
               className="group"
@@ -157,13 +156,13 @@ const Home = () => {
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
                   src="https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=1974" 
-                  alt="Curated Collection" 
+                  alt="Curated Dining" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
                 />
               </div>
               <div className="text-center px-4">
-                <h4 className="text-xl font-serif text-neutral-900 mb-3 uppercase tracking-wider">Curated Collection</h4>
+                <h4 className="text-xl font-serif text-neutral-900 mb-3 uppercase tracking-wider">Curated Dining</h4>
                 <p className="text-sm text-neutral-500 font-light leading-relaxed mb-6">
                   Seasonal, multi-course tasting experience. A modern interpretation of fine dining, 
                   where each course tells a story of craftsmanship.

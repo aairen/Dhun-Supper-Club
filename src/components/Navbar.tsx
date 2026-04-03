@@ -147,69 +147,85 @@ const Navbar = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-neutral-200 overflow-hidden"
+            className="md:hidden bg-white border-t border-neutral-100 overflow-hidden"
           >
-            <div className="px-4 pt-2 pb-6 space-y-2">
+            <div className="px-6 py-10 space-y-8">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   onClick={() => setIsOpen(false)}
-                  className="block px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 rounded-md"
+                  className="block text-xl font-serif text-neutral-900 uppercase tracking-widest"
                 >
                   {link.name}
                 </Link>
               ))}
-              {user && (
-                <Link
-                  to="/buy-credits"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center space-x-2 px-3 py-2 text-base font-bold text-neutral-900 bg-neutral-100 rounded-md"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>{profile?.credits || 0} Credits</span>
-                </Link>
-              )}
+              
               {user ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setIsOpen(false)}
-                    className="block px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 rounded-md"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsOpen(false)}
-                    className="block px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 rounded-md"
-                  >
-                    Settings
-                  </Link>
-                  {isAdmin && (
+                <div className="space-y-8 pt-8 border-t border-neutral-100">
+                  <div className="flex items-center justify-between">
                     <Link
-                      to="/admin"
+                      to="/buy-credits"
                       onClick={() => setIsOpen(false)}
-                      className="block px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 rounded-md"
+                      className="flex items-center space-x-2 text-xs font-bold text-neutral-900 uppercase tracking-widest"
                     >
-                      Admin
+                      <CreditCard className="w-4 h-4" />
+                      <span>{profile?.credits || 0} Credits</span>
                     </Link>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-base font-medium text-red-600 hover:bg-neutral-50 rounded-md"
-                  >
-                    Logout
-                  </button>
-                </>
+                    <Link 
+                      to="/buy-credits" 
+                      onClick={() => setIsOpen(false)}
+                      className="text-[10px] font-bold uppercase tracking-widest border-b border-neutral-900"
+                    >
+                      Add
+                    </Link>
+                  </div>
+
+                  <div className="space-y-6">
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setIsOpen(false)}
+                      className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/settings"
+                      onClick={() => setIsOpen(false)}
+                      className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
+                    >
+                      Settings
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsOpen(false)}
+                        className="block text-lg font-serif text-neutral-900 uppercase tracking-widest"
+                      >
+                        Admin
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsOpen(false);
+                      }}
+                      className="block text-lg font-serif text-red-600 uppercase tracking-widest"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <Link
-                  to="/auth"
-                  onClick={() => setIsOpen(false)}
-                  className="block px-3 py-2 text-base font-medium text-neutral-900 border border-neutral-900 text-center rounded-md"
-                >
-                  Sign In
-                </Link>
+                <div className="pt-8 border-t border-neutral-100">
+                  <Link
+                    to="/auth"
+                    onClick={() => setIsOpen(false)}
+                    className="block w-full bg-neutral-900 text-white py-4 text-center text-xs font-bold uppercase tracking-widest"
+                  >
+                    Sign In
+                  </Link>
+                </div>
               )}
             </div>
           </motion.div>

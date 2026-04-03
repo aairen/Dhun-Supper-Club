@@ -32,7 +32,7 @@ const getAppLink = (path: string) => {
   const origin = window.location.origin;
   // If we're on GitHub Pages, BASE_URL might be '/Dhun-Supper-Club/'
   // If we're local/AI Studio, BASE_URL is './'
-  const base = import.meta.env.BASE_URL === './' ? '' : import.meta.env.BASE_URL;
+  const base = (import.meta as any).env.BASE_URL === './' ? '' : (import.meta as any).env.BASE_URL;
   // Ensure base doesn't end with / if it's not empty
   const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
   return `${origin}${cleanBase}/#${path}`;
@@ -49,14 +49,14 @@ export const emailTemplates = {
           Welcome to Dhun Supper Club. We are delighted to have you as part of our community of food explorers.
         </p>
         <p style="font-size: 16px; line-height: 1.6; color: #525252; margin-bottom: 40px;">
-          You can now browse our upcoming Curated Collection and secure your seat at our table.
+          You can now browse our upcoming Curated Dining and secure your seat at our table.
         </p>
         <div style="text-align: center;">
           <a href="${getAppLink("/events")}" style="background-color: #171717; color: white; padding: 16px 32px; text-decoration: none; text-transform: uppercase; font-size: 12px; font-weight: bold; letter-spacing: 0.1em;">Browse Experiences</a>
         </div>
         <hr style="margin: 60px 0 30px; border: 0; border-top: 1px solid #e5e5e5;" />
         <p style="font-size: 12px; color: #a3a3a3; text-align: center; text-transform: uppercase; letter-spacing: 0.1em;">
-          Dhun Supper Club • Curated Collection
+          Dhun Supper Club • Curated Dining
         </p>
       </div>
     `

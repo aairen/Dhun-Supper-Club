@@ -36,7 +36,7 @@ export function generateAutoEvents(): DiningEvent[] {
       // Evening Event
       events.push({
         id: `curated-${format(day, "yyyy-MM-dd")}`,
-        title: "Curated Collection",
+        title: "Curated Dining",
         description: "A seasonal, multi-course tasting experience exploring modern interpretations of fine dining.",
         dateTime: format(day, "yyyy-MM-dd'T'19:30:00"),
         capacity: 16,

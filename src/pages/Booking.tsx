@@ -214,7 +214,7 @@ const Booking = () => {
   if (!event) return <div className="min-h-screen flex items-center justify-center bg-white text-neutral-900 transition-colors duration-300">Experience not found.</div>;
 
   return (
-    <div className="min-h-screen bg-neutral-50 py-24 transition-colors duration-300">
+    <div className="min-h-screen bg-neutral-50 py-12 md:py-24 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4">
         <button 
           onClick={() => navigate("/events")}
@@ -224,9 +224,9 @@ const Booking = () => {
           Back to Events
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
           {/* Event Details */}
-          <div className="space-y-8">
+          <div className="space-y-6 md:space-y-8">
             <div className="aspect-square bg-neutral-200 overflow-hidden">
               <img 
                 src={event.type === 'thali' 
@@ -241,7 +241,7 @@ const Booking = () => {
               />
             </div>
             <div>
-              <h1 className="text-3xl font-serif text-neutral-900 mb-2 uppercase tracking-wider">{event.title}</h1>
+              <h1 className="text-2xl md:text-3xl font-serif text-neutral-900 mb-2 uppercase tracking-wider">{event.title}</h1>
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-[10px] text-neutral-400 uppercase tracking-widest mb-6">
                 <div className="flex items-center">
                   <Calendar className="w-3 h-3 mr-1" />
@@ -256,15 +256,15 @@ const Booking = () => {
                   {event.creditsPerPerson} Credits
                 </div>
               </div>
-              <p className="text-neutral-500 font-light leading-relaxed">
+              <p className="text-sm md:text-base text-neutral-500 font-light leading-relaxed">
                 {event.description}
               </p>
             </div>
           </div>
 
           {/* Booking Form */}
-          <div className="bg-white border border-neutral-200 p-8 shadow-sm h-fit">
-            <h2 className="text-xl font-serif mb-8 uppercase tracking-widest text-neutral-900">
+          <div className="bg-white border border-neutral-200 p-6 md:p-8 shadow-sm h-fit">
+            <h2 className="text-lg md:text-xl font-serif mb-6 md:mb-8 uppercase tracking-widest text-neutral-900">
               {existingBooking ? "Edit Reservation" : "Reservation Details"}
             </h2>
             
@@ -308,10 +308,13 @@ const Booking = () => {
                     <span className="text-neutral-500">Credits per person</span>
                     <div className="text-right flex items-center space-x-2">
                       {isSpecial && isMember ? (
-                        <>
+                        <div className="flex items-center space-x-3">
                           <span className="font-bold text-indigo-600">{event.creditsPerPerson - 1}</span>
-                          <span className="text-neutral-400 line-through">{event.creditsPerPerson}</span>
-                        </>
+                          <span className="relative inline-block text-neutral-500">
+                            {event.creditsPerPerson}
+                            <span className="absolute top-1/2 left-0 w-full h-[1px] bg-red-500/70 -rotate-[35deg] origin-center"></span>
+                          </span>
+                        </div>
                       ) : (
                         <span className="font-medium text-neutral-900">{event.creditsPerPerson}</span>
                       )}
@@ -325,7 +328,7 @@ const Booking = () => {
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-serif">
-                  <span className="text-neutral-900">Total Credits</span>
+                  <span className="text-neutral-900">Total Credits ({effectiveCreditsPerPerson} × {numPeople})</span>
                   <span className="text-neutral-900">{totalCredits}</span>
                 </div>
               </div>
@@ -337,19 +340,21 @@ const Booking = () => {
                 </div>
               ) : (
                 <div className="space-y-4 pt-4">
-                  <div className="flex items-start space-x-2 text-[10px] text-neutral-400 uppercase tracking-widest leading-relaxed mb-4">
-                    <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                    <p>Reservations cannot be canceled or refunded within 14 days of the event.</p>
-                  </div>
-
                   {hasEnoughCredits ? (
-                    <button
-                      onClick={handleBooking}
-                      disabled={bookingLoading || (existingBooking && numPeople === existingBooking.numPeople)}
-                      className="w-full bg-neutral-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-neutral-800 transition-all disabled:opacity-50"
-                    >
-                      {bookingLoading ? "Processing..." : existingBooking ? "Update Reservation" : "Confirm Reservation"}
-                    </button>
+                    <div className="space-y-4">
+                      <button
+                        onClick={handleBooking}
+                        disabled={bookingLoading || (existingBooking && numPeople === existingBooking.numPeople)}
+                        className="w-full bg-neutral-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-neutral-800 transition-all disabled:opacity-50"
+                      >
+                        {bookingLoading ? "Processing..." : existingBooking ? "Update Reservation" : "Confirm Reservation"}
+                      </button>
+                      
+                      <div className="flex items-start space-x-2 text-[10px] text-neutral-400 uppercase tracking-widest leading-relaxed">
+                        <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <p>Reservations cannot be canceled or refunded within 14 days of the event.</p>
+                      </div>
+                    </div>
                   ) : (
                     <div className="space-y-6">
                       <div className="bg-amber-50 border border-amber-100 p-4 text-amber-800 text-sm rounded">
@@ -369,6 +374,12 @@ const Booking = () => {
                           <CreditCard className="w-4 h-4 mr-2" />
                           Buy and Book
                         </Link>
+                        
+                        <div className="flex items-start space-x-2 text-[10px] text-neutral-400 uppercase tracking-widest leading-relaxed">
+                          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          <p>Reservations cannot be canceled or refunded within 14 days of the event.</p>
+                        </div>
+
                         <button 
                           onClick={() => navigate("/events")}
                           className="w-full border border-neutral-200 text-neutral-500 py-4 font-bold uppercase tracking-widest hover:bg-neutral-50 transition-all"

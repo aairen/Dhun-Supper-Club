@@ -17,7 +17,7 @@ const BuyCredits = () => {
   const eventId = searchParams.get("eventId");
   const numPeople = searchParams.get("numPeople");
   
-  const [credits, setCredits] = useState<number | string>(initialMissing > 0 ? initialMissing : 5);
+  const [credits, setCredits] = useState<number | string>(initialMissing > 0 ? initialMissing : 10);
   const [loading, setLoading] = useState(false);
 
   const pricePerCredit = 10;
@@ -76,7 +76,7 @@ const BuyCredits = () => {
   const isDemoMode = !(import.meta as any).env.VITE_STRIPE_PUBLIC_KEY || (import.meta as any).env.VITE_STRIPE_PUBLIC_KEY === "YOUR_STRIPE_PUBLIC_KEY" || (import.meta as any).env.VITE_STRIPE_PUBLIC_KEY === "pk_test_mock";
 
   return (
-    <div className="min-h-screen bg-neutral-50 py-24">
+    <div className="min-h-screen bg-neutral-50 py-12 md:py-24">
       <div className="max-w-4xl mx-auto px-4">
         
         {isDemoMode && (
@@ -86,14 +86,14 @@ const BuyCredits = () => {
           </div>
         )}
 
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-serif text-neutral-900 mb-4 uppercase tracking-widest">Credit Wallet</h1>
-          <p className="text-neutral-500 font-light">Purchase credits to book your next dining experience.</p>
+        <div className="text-center mb-12 md:mb-16">
+          <h1 className="text-3xl md:text-4xl font-serif text-neutral-900 mb-4 uppercase tracking-widest">Credit Wallet</h1>
+          <p className="text-sm md:text-base text-neutral-500 font-light">Purchase credits to book your next dining experience.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
           {/* Purchase Controls */}
-          <div className="bg-white border border-neutral-200 p-8 shadow-sm space-y-8">
+          <div className="bg-white border border-neutral-200 p-6 md:p-8 shadow-sm space-y-8">
             <div className="space-y-4">
               <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Select Amount</label>
               <div className="flex items-center justify-between bg-neutral-50 p-4 border border-neutral-100">
@@ -120,7 +120,7 @@ const BuyCredits = () => {
                         setCredits(5);
                       }
                     }}
-                    className="w-20 text-4xl font-serif text-neutral-900 bg-transparent text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-16 md:w-20 text-3xl md:text-4xl font-serif text-neutral-900 bg-transparent text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Credits</p>
                 </div>
@@ -134,25 +134,25 @@ const BuyCredits = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-3 md:gap-4">
                 {[10, 25, 50].map(amount => (
                   <div key={amount} className="relative">
                     {amount === 50 && (
-                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center space-x-1 text-[10px] font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 whitespace-nowrap">
-                        <Gift className="w-3 h-3" />
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center space-x-1 text-[8px] md:text-[10px] font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 whitespace-nowrap">
+                        <Gift className="w-2 md:w-3 h-2 md:h-3" />
                         <span>+5 bonus</span>
                       </div>
                     )}
                     <button
                       onClick={() => setCredits(amount)}
                       className={cn(
-                        "w-full py-3 text-xs font-bold uppercase tracking-widest border transition-all",
-                        credits === amount 
+                        "w-full py-3 text-[10px] md:text-xs font-bold uppercase tracking-widest border transition-all",
+                        Number(credits) === amount 
                           ? "bg-neutral-900 text-white border-neutral-900" 
                           : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-900"
                       )}
                     >
-                      {amount} Credits
+                      {amount}
                     </button>
                   </div>
                 ))}
@@ -164,8 +164,8 @@ const BuyCredits = () => {
           </div>
 
           {/* Order Summary */}
-          <div className="bg-white border border-neutral-200 p-8 shadow-sm h-fit">
-            <h2 className="text-xl font-serif mb-8 uppercase tracking-widest">Order Summary</h2>
+          <div className="bg-white border border-neutral-200 p-6 md:p-8 shadow-sm h-fit">
+            <h2 className="text-lg md:text-xl font-serif mb-6 md:mb-8 uppercase tracking-widest">Order Summary</h2>
             
             <div className="space-y-4">
               <div className="flex justify-between text-sm">

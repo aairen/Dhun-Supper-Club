@@ -9,7 +9,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Chrome } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { handleFirestoreError, OperationType } from "../lib/firestore";
@@ -276,7 +276,7 @@ const AuthPage = () => {
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-neutral-200 bg-white text-neutral-700 font-medium hover:bg-neutral-50 transition-all"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-neutral-200 bg-white text-neutral-700 font-medium hover:bg-neutral-50 transition-all mb-3"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -300,7 +300,7 @@ const AuthPage = () => {
           </button>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
+    <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
             className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors"

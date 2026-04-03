@@ -12,7 +12,6 @@ const Contact = () => {
   const [formData, setFormData] = useState({
     subject: "",
     email: "",
-    instagram: "",
     body: "",
   });
 
@@ -25,13 +24,12 @@ const Contact = () => {
         userId: user?.uid || "anonymous",
         subject: formData.subject,
         email: formData.email,
-        instagram: formData.instagram,
         body: formData.body,
         status: "unread",
         createdAt: serverTimestamp(),
       });
       setSuccess(true);
-      setFormData({ subject: "", email: "", instagram: "", body: "" });
+      setFormData({ subject: "", email: "", body: "" });
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -126,19 +124,6 @@ const Contact = () => {
                         placeholder="your@email.com"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Instagram Handle (Optional)</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-neutral-200 focus:border-neutral-900 outline-none transition-all text-sm"
-                        placeholder="@yourhandle"
-                        value={formData.instagram}
-                        onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
                       />
                     </div>
                   </div>
