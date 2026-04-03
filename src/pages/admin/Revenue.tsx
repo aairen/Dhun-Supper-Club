@@ -142,26 +142,43 @@ const AdminRevenue = () => {
 
       {/* Monthly Table */}
       <div className="bg-white border border-neutral-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-neutral-50 border-b border-neutral-200">
-            <tr>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Month</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Revenue</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Credits</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Transactions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {monthlyData.slice().reverse().map((data: any) => (
-              <tr key={data.month} className="hover:bg-neutral-50 transition-colors">
-                <td className="px-6 py-4 font-serif text-neutral-900">{data.month}</td>
-                <td className="px-6 py-4 text-neutral-900 font-medium">${data.revenue.toLocaleString()}</td>
-                <td className="px-6 py-4 text-neutral-500">{data.credits.toLocaleString()} credits</td>
-                <td className="px-6 py-4 text-neutral-500">{data.transactions} transactions</td>
+        {/* Mobile Card Layout */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {monthlyData.slice().reverse().map((data: any) => (
+            <div key={data.month} className="p-4 space-y-2">
+              <div className="font-serif text-neutral-900">{data.month}</div>
+              <div className="flex items-center text-xs text-neutral-500 gap-4">
+                <div className="font-medium text-neutral-900">${data.revenue.toLocaleString()}</div>
+                <div>{data.credits.toLocaleString()} credits</div>
+                <div>{data.transactions} transactions</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
+              <tr>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Month</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Revenue</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Credits</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Transactions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {monthlyData.slice().reverse().map((data: any) => (
+                <tr key={data.month} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-6 py-4 font-serif text-neutral-900">{data.month}</td>
+                  <td className="px-6 py-4 text-neutral-900 font-medium">${data.revenue.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-neutral-500">{data.credits.toLocaleString()} credits</td>
+                  <td className="px-6 py-4 text-neutral-500">{data.transactions} transactions</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

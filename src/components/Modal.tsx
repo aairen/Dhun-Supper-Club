@@ -39,11 +39,11 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className={cn(
-                "relative w-full max-w-md overflow-hidden bg-white shadow-2xl border border-neutral-200 p-6 md:p-8",
+                "relative w-full max-w-md bg-white p-8 shadow-2xl border border-neutral-100",
                 className
               )}
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-8">
                 {title && (
                   <h3 className="text-xl font-serif text-neutral-900 uppercase tracking-widest">
                     {title}
@@ -51,12 +51,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
                 )}
                 <button
                   onClick={onClose}
-                  className="ml-auto p-1 text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="ml-auto p-1 text-neutral-400 hover:text-neutral-900 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="relative">{children}</div>
+              <div className="relative space-y-6">{children}</div>
             </motion.div>
         </div>
       )}

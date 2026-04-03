@@ -17,16 +17,21 @@ console.log("[ENV CHECK] VITE_FIREBASE_PROJECT_ID:", process.env.VITE_FIREBASE_P
 console.log("[ENV CHECK] VITE_FIREBASE_FIRESTORE_DATABASE_ID:", process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "Not Set");
 console.log("[ENV CHECK] APP_URL:", process.env.APP_URL || "Not Set");
 
-const firebaseConfig = {
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)",
-};
+const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
 
 // Helper to check for placeholder values
 const isPlaceholder = (val: string | undefined) => {
   if (!val) return true;
   const upper = val.toUpperCase();
   return upper.includes("YOUR_") || upper.includes("MY_") || upper === "TODO";
+};
+
+// Helper to check if user is admin (including bootstrap logic)
+const isUserAdmin = (decodedToken: any, callerSnap: any) => {
+  const callerData = callerSnap.data();
+  const isAdminRole = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+  const isBootstrapAdmin = (decodedToken.email === "airenarjun6@gmail.com" && decodedToken.email_verified);
+  return isAdminRole || isBootstrapAdmin;
 };
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -76,18 +81,17 @@ let db: any = null;
 
 async function getDb() {
   if (!adminApp) {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+    const projectId = firebaseConfig.projectId;
     
     try {
-      // If projectId is a placeholder or missing, let it auto-discover
-      if (isPlaceholder(projectId)) {
-        console.log(`[FIREBASE ADMIN] Initializing with AUTO-DISCOVERY (Project ID was placeholder or missing)`);
-        adminApp = admin.initializeApp();
-      } else {
-        console.log(`[FIREBASE ADMIN] Initializing with projectId: ${projectId}`);
+      if (projectId && !isPlaceholder(projectId)) {
+        console.log(`[FIREBASE ADMIN] Initializing with explicit projectId: ${projectId}`);
         adminApp = admin.initializeApp({ projectId });
+      } else {
+        console.log(`[FIREBASE ADMIN] Initializing with default credentials (no valid projectId found)...`);
+        adminApp = admin.initializeApp();
       }
-      console.log(`[FIREBASE ADMIN] Initialized successfully`);
+      console.log(`[FIREBASE ADMIN] Initialized successfully. Project: ${adminApp.options.projectId || "Default"}`);
     } catch (err: any) {
       if (err.code === 'app/duplicate-app') {
         adminApp = admin.app();
@@ -100,10 +104,7 @@ async function getDb() {
   }
 
   if (!db) {
-    // In Cloud Run, the default database is used if no ID is provided
     let dbId = firebaseConfig.firestoreDatabaseId;
-    
-    // Normalize dbId: treat "(default)" or placeholders as undefined
     if (dbId === "(default)" || isPlaceholder(dbId)) {
       dbId = undefined;
     }
@@ -554,7 +555,7 @@ async function startServer() {
 
   startReminderJob();
 
-  // Admin API: Delete Event and Refund
+      // Admin API: Delete Event and Refund
   app.post("/api/admin/delete-event", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -570,14 +571,16 @@ async function startServer() {
       // Verify caller is admin
       let callerSnap;
       try {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.log(`[ADMIN API] Reading user ${decodedToken.uid} from project: ${projectId}`);
         callerSnap = await db.collection("users").doc(decodedToken.uid).get();
       } catch (fsErr: any) {
-        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid} in project ${projectId}:`, fsErr);
         throw fsErr;
       }
       
-      const callerData = callerSnap.data();
-      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
 
       if (!isAdmin) {
         return res.status(403).json({ error: "Forbidden: Admin access required" });
@@ -655,14 +658,16 @@ async function startServer() {
       // Verify caller is admin
       let callerSnap;
       try {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.log(`[ADMIN API] Reading user ${decodedToken.uid} from project: ${projectId}`);
         callerSnap = await db.collection("users").doc(decodedToken.uid).get();
       } catch (fsErr: any) {
-        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid} in project ${projectId}:`, fsErr);
         throw fsErr;
       }
       
-      const callerData = callerSnap.data();
-      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
 
       if (!isAdmin) {
         return res.status(403).json({ error: "Forbidden: Admin access required" });
@@ -728,17 +733,19 @@ async function startServer() {
       // Verify caller is admin
       let callerSnap;
       try {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.log(`[ADMIN API] Reading user ${decodedToken.uid} from project: ${projectId}`);
         callerSnap = await db.collection("users").doc(decodedToken.uid).get();
       } catch (fsErr: any) {
-        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid} in project ${projectId}:`, fsErr);
         throw fsErr;
       }
       
-      const callerData = callerSnap.data();
-      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
 
       if (!isAdmin) {
-        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin. Role found: ${callerData?.role}`);
+        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin.`);
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
 
@@ -777,17 +784,19 @@ async function startServer() {
       // Verify caller is admin
       let callerSnap;
       try {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.log(`[ADMIN API] Reading user ${decodedToken.uid} from project: ${projectId}`);
         callerSnap = await db.collection("users").doc(decodedToken.uid).get();
       } catch (fsErr: any) {
-        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid} in project ${projectId}:`, fsErr);
         throw fsErr;
       }
       
-      const callerData = callerSnap.data();
-      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
 
       if (!isAdmin) {
-        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin. Role found: ${callerData?.role}`);
+        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin.`);
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
 

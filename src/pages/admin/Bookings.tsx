@@ -202,70 +202,111 @@ const AdminBookings = () => {
       </div>
 
       <div className="bg-white border border-neutral-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-neutral-50 border-b border-neutral-200">
-            <tr>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">User</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Event</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Details</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Booking Date</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
-                </td>
-              </tr>
-            ) : filteredBookings.map(booking => (
-              <tr key={booking.id} className="hover:bg-neutral-50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <Mail className="w-3 h-3 mr-2 text-neutral-400" />
-                    <span className="text-neutral-900 font-medium">{booking.userEmail}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
-                    <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-neutral-500">
-                  <div className="flex items-center">
-                    <Users className="w-3 h-3 mr-2" />
-                    {booking.numPeople} {booking.numPeople === 1 ? "person" : "people"}
-                  </div>
-                  <div className="flex items-center mt-1">
-                    <DollarSign className="w-3 h-3 mr-2" />
-                    {booking.totalCredits} credits
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-neutral-500">
-                  {format(parseISO(booking.createdAt), "MMM dd, yyyy")}
-                </td>
-                <td className="px-6 py-4 text-right">
+        {/* Mobile Card Layout */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {loading ? (
+            <div className="p-6 text-center">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
+            </div>
+          ) : filteredBookings.length > 0 ? (
+            filteredBookings.map(booking => (
+              <div key={booking.id} className="p-4 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div className="font-medium text-neutral-900">{booking.userEmail}</div>
                   <button 
                     onClick={() => handleCancelBooking(booking.id)}
                     disabled={cancellingId === booking.id}
-                    className="text-xs font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                    className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
                   >
                     {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
                   </button>
-                </td>
-              </tr>
-            ))}
-            {!loading && filteredBookings.length === 0 && (
+                </div>
+                <div className="text-sm font-serif text-neutral-900">{booking.eventTitle}</div>
+                <div className="flex items-center text-xs text-neutral-500 gap-4">
+                  <div className="flex items-center">
+                    <Users className="w-3 h-3 mr-1" />
+                    {booking.numPeople}
+                  </div>
+                  <div className="flex items-center">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    {booking.totalCredits}
+                  </div>
+                  <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy")}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-center text-neutral-400 italic">No bookings found.</div>
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
-                  No bookings found.
-                </td>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">User</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Event</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Details</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Booking Date</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
+                  </td>
+                </tr>
+              ) : filteredBookings.map(booking => (
+                <tr key={booking.id} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <Mail className="w-3 h-3 mr-2 text-neutral-400" />
+                      <span className="text-neutral-900 font-medium">{booking.userEmail}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
+                      <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-500">
+                    <div className="flex items-center">
+                      <Users className="w-3 h-3 mr-2" />
+                      {booking.numPeople} {booking.numPeople === 1 ? "person" : "people"}
+                    </div>
+                    <div className="flex items-center mt-1">
+                      <DollarSign className="w-3 h-3 mr-2" />
+                      {booking.totalCredits} credits
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-500">
+                    {format(parseISO(booking.createdAt), "MMM dd, yyyy")}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => handleCancelBooking(booking.id)}
+                      disabled={cancellingId === booking.id}
+                      className="text-xs font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                    >
+                      {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!loading && filteredBookings.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
+                    No bookings found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

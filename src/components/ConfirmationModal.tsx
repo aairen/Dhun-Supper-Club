@@ -48,17 +48,27 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="flex flex-col">
-        <div className={cn("mb-6 p-4 border border-neutral-100 flex items-center gap-3", currentVariant.bg)}>
-          {currentVariant.icon}
-          <p className="text-[10px] text-neutral-500 uppercase tracking-widest leading-relaxed">
-            Please review this action carefully before proceeding.
+      <div className="space-y-6">
+        <div className={cn("p-4 border flex items-start gap-3", 
+          variant === "danger" ? "bg-red-50 border-red-100" : "bg-neutral-50 border-neutral-100"
+        )}>
+          {variant === "danger" ? (
+            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          ) : (
+            <Info className="h-5 w-5 text-neutral-600 shrink-0 mt-0.5" />
+          )}
+          <p className={cn("text-[10px] uppercase tracking-widest leading-relaxed",
+            variant === "danger" ? "text-red-700" : "text-neutral-500"
+          )}>
+            Please review this action carefully. Actions taken here are final and may affect user credits.
           </p>
         </div>
-        <p className="mb-10 text-sm md:text-base text-neutral-500 font-light leading-relaxed">
+        
+        <p className="text-sm text-neutral-500 font-light leading-relaxed">
           {message}
         </p>
-        <div className="flex flex-col gap-3">
+        
+        <div className="pt-4 space-y-3">
           <button
             onClick={onConfirm}
             disabled={isLoading}

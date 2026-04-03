@@ -554,85 +554,26 @@ const AdminEvents = () => {
       </AnimatePresence>
 
       <div className="bg-white border border-neutral-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-neutral-50 border-b border-neutral-200">
-            <tr>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Event</th>
-              <th 
-                className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
-                onClick={() => requestSort("type")}
-              >
-                <div className="flex items-center">
-                  Type
-                  <SortIcon column="type" />
-                </div>
-              </th>
-              <th 
-                className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
-                onClick={() => requestSort("dateTime")}
-              >
-                <div className="flex items-center">
-                  Date
-                  <SortIcon column="dateTime" />
-                </div>
-              </th>
-              <th 
-                className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
-                onClick={() => requestSort("capacity")}
-              >
-                <div className="flex items-center">
-                  Open Seats
-                  <SortIcon column="capacity" />
-                </div>
-              </th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Credits</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {sortedEvents.map(event => (
-              <tr key={event.id} className="hover:bg-neutral-50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
-                      {event.imageUrl ? (
-                        <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="w-4 h-4 text-neutral-300" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="font-serif text-neutral-900 block">{event.title}</span>
+        {/* Mobile Card Layout */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {sortedEvents.length > 0 ? (
+            sortedEvents.map(event => (
+              <div key={event.id} className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 flex-shrink-0 overflow-hidden">
+                    {event.imageUrl ? (
+                      <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4 text-neutral-300" />
+                      </div>
+                    )}
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</span>
-                </td>
-                <td className="px-6 py-4 text-neutral-500">
-                  <div className="flex items-center">
-                    <Calendar className="w-3 h-3 mr-2" />
-                    {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-serif text-neutral-900 truncate">{event.title}</div>
+                    <div className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</div>
                   </div>
-                  <div className="flex items-center mt-1">
-                    <Clock className="w-3 h-3 mr-2" />
-                    {format(parseISO(event.dateTime), "h:mm a")}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-neutral-500">
-                  <div className="flex items-center">
-                    <Users className="w-3 h-3 mr-2" />
-                    {event.bookedSeats || 0} / {event.capacity}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-neutral-500">
-                  <div className="flex items-center">
-                    <DollarSign className="w-3 h-3 mr-2" />
-                    {event.creditsPerPerson}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end space-x-2">
+                  <div className="flex items-center gap-1">
                     <button 
                       onClick={() => handleEdit(event)}
                       className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"
@@ -648,18 +589,137 @@ const AdminEvents = () => {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {events.length === 0 && (
+                </div>
+                <div className="flex items-center text-xs text-neutral-500 gap-4">
+                  <div className="flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                  </div>
+                  <div className="flex items-center">
+                    <Users className="w-3 h-3 mr-1" />
+                    {event.bookedSeats || 0} / {event.capacity}
+                  </div>
+                  <div className="flex items-center">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    {event.creditsPerPerson}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-center text-neutral-400 italic">No events found.</div>
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
-                  No events found.
-                </td>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Event</th>
+                <th 
+                  className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
+                  onClick={() => requestSort("type")}
+                >
+                  <div className="flex items-center">
+                    Type
+                    <SortIcon column="type" />
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
+                  onClick={() => requestSort("dateTime")}
+                >
+                  <div className="flex items-center">
+                    Date
+                    <SortIcon column="dateTime" />
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
+                  onClick={() => requestSort("capacity")}
+                >
+                  <div className="flex items-center">
+                    Open Seats
+                    <SortIcon column="capacity" />
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Credits</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {sortedEvents.map(event => (
+                <tr key={event.id} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
+                        {event.imageUrl ? (
+                          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="w-4 h-4 text-neutral-300" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-serif text-neutral-900 block">{event.title}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</span>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-500">
+                    <div className="flex items-center">
+                      <Calendar className="w-3 h-3 mr-2" />
+                      {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                    </div>
+                    <div className="flex items-center mt-1">
+                      <Clock className="w-3 h-3 mr-2" />
+                      {format(parseISO(event.dateTime), "h:mm a")}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-500">
+                    <div className="flex items-center">
+                      <Users className="w-3 h-3 mr-2" />
+                      {event.bookedSeats || 0} / {event.capacity}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-500">
+                    <div className="flex items-center">
+                      <DollarSign className="w-3 h-3 mr-2" />
+                      {event.creditsPerPerson}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button 
+                        onClick={() => handleEdit(event)}
+                        className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"
+                        title="Edit Event"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(event.id)}
+                        className="text-neutral-400 hover:text-red-600 transition-colors p-2"
+                        title="Delete Event"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-neutral-400 italic">
+                    No events found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
