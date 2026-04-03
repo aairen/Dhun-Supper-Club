@@ -9,16 +9,11 @@ import { Calendar, CreditCard, Star, Clock, AlertCircle, XCircle, ChevronRight, 
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { generateAutoEvents } from "../lib/eventUtils";
+import { AlertModal } from "../components/AlertModal";
 
 const Dashboard = () => {
-  const { profile, user, isAdmin } = useAuth();
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAdmin) {
-      navigate("/admin", { replace: true });
-    }
-  }, [isAdmin, navigate]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +24,12 @@ const Dashboard = () => {
   const [showConfirmCancelModal, setShowConfirmCancelModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; title: string; message: string; variant: "error" | "info" | "success" }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "info",
+  });
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
@@ -163,7 +164,12 @@ const Dashboard = () => {
       });
     } catch (err) {
       console.error("Cancellation error:", err);
-      alert("Failed to cancel reservation. Please try again.");
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to cancel reservation. Please try again.",
+        variant: "error",
+      });
     } finally {
       setCancellingId(null);
     }
@@ -180,6 +186,13 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12 md:py-24 transition-colors duration-300">
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.variant}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {paymentSuccess && (

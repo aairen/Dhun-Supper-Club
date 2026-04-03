@@ -69,11 +69,19 @@ const AuthPage = () => {
             body: template.body,
             type: "welcome",
           });
+          navigate("/dashboard");
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+          navigate("/dashboard");
+        }
+      } else {
+        const userData = userDoc.data();
+        if (userData?.role?.toLowerCase() === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
         }
       }
-      navigate("/dashboard");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -94,7 +102,14 @@ const AuthPage = () => {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password);
+        const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+        const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+        const userData = userDoc.data();
+        if (userData?.role?.toLowerCase() === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
       } else {
         const userCredential = await createUserWithEmailAndPassword(
           auth,
@@ -135,8 +150,8 @@ const AuthPage = () => {
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
         }
+        navigate("/dashboard");
       }
-      navigate("/dashboard");
     } catch (err: any) {
       if (err.code === "auth/operation-not-allowed") {
         setError("Email/Password authentication is not enabled in the Firebase Console. Please enable it or use Google Login.");

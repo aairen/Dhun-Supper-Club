@@ -93,7 +93,7 @@ const Home = () => {
             <h3 className="text-3xl md:text-4xl font-serif text-neutral-900 uppercase tracking-widest">Experiences at Dhun</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 max-w-5xl mx-auto">
             {/* Grand Thali */}
             <motion.div 
               whileHover={{ y: -10 }}
@@ -169,7 +169,33 @@ const Home = () => {
                 </p>
                 <div className="flex items-center justify-center space-x-2 text-neutral-400 text-[10px] uppercase tracking-widest">
                   <Star className="w-3 h-3 fill-current" />
-                  <span>8 Credits per person</span>
+                  <span>7 Credits per person</span>
+                  <Star className="w-3 h-3 fill-current" />
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Hands-On Cooking */}
+            <motion.div 
+              whileHover={{ y: -10 }}
+              className="group"
+            >
+              <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
+                <img 
+                  src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1974" 
+                  alt="Hands-On Cooking" 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="text-center px-4">
+                <h4 className="text-xl font-serif text-neutral-900 mb-3 uppercase tracking-wider">Hands-On Cooking</h4>
+                <p className="text-sm text-neutral-500 font-light leading-relaxed mb-6">
+                  Learn to cook healthy home-style meals using fresh seasonal ingredients in an interactive 2-hour session.
+                </p>
+                <div className="flex items-center justify-center space-x-2 text-neutral-400 text-[10px] uppercase tracking-widest">
+                  <Star className="w-3 h-3 fill-current" />
+                  <span>4 Credits per person</span>
                   <Star className="w-3 h-3 fill-current" />
                 </div>
               </div>

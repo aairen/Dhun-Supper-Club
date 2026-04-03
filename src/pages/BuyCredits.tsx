@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { CreditCard, Plus, Minus, Info, CheckCircle, ArrowRight, Gift } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { cn } from "../lib/utils";
+import { AlertModal } from "../components/AlertModal";
 
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLIC_KEY || "pk_test_mock");
 
@@ -19,6 +20,12 @@ const BuyCredits = () => {
   
   const [credits, setCredits] = useState<number | string>(initialMissing > 0 ? initialMissing : 10);
   const [loading, setLoading] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; title: string; message: string; variant: "error" | "info" | "success" }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "info",
+  });
 
   const pricePerCredit = 10;
   const taxRate = 0.0876;
@@ -67,7 +74,12 @@ const BuyCredits = () => {
       }
     } catch (error: any) {
       console.error("Purchase error:", error);
-      alert("Failed to add credits. Please try again.");
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to add credits. Please try again.",
+        variant: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -77,6 +89,13 @@ const BuyCredits = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50 py-12 md:py-24">
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.variant}
+      />
       <div className="max-w-4xl mx-auto px-4">
         
         {isDemoMode && (

@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, writeBatch } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { Booking, DiningEvent, UserProfile } from "../../types";
 import { format, parseISO } from "date-fns";
-import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign } from "lucide-react";
+import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser } from "lucide-react";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { AlertModal } from "../../components/AlertModal";
 
 const AdminBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; title: string; message: string; variant: "error" | "info" | "success" }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "info",
+  });
 
   useEffect(() => {
     const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
@@ -37,11 +49,55 @@ const AdminBookings = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleCancelBooking = async (bookingId: string) => {
-    if (!window.confirm("Are you sure you want to cancel this booking? This will refund the credits to the user.")) {
-      return;
-    }
+  const handleClearBookings = async () => {
+    setShowClearModal(true);
+  };
 
+  const confirmClearBookings = async () => {
+    setShowClearModal(false);
+    setClearing(true);
+    try {
+      // 1. Delete all bookings
+      const bookingSnapshot = await getDocs(collection(db, "bookings"));
+      const batch = writeBatch(db);
+      bookingSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      // 2. Reset all event bookedSeats to 0
+      const eventSnapshot = await getDocs(collection(db, "events"));
+      eventSnapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { bookedSeats: 0 });
+      });
+
+      await batch.commit();
+      setAlertConfig({
+        isOpen: true,
+        title: "Success",
+        message: "All bookings cleared successfully.",
+        variant: "success",
+      });
+    } catch (err: any) {
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to clear bookings",
+        variant: "error",
+      });
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    setBookingToCancel(bookingId);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancelBooking = async () => {
+    if (!bookingToCancel) return;
+    const bookingId = bookingToCancel;
+    setShowCancelModal(false);
     setCancellingId(bookingId);
     try {
       const user = auth.currentUser;
@@ -64,9 +120,15 @@ const AdminBookings = () => {
       
       // The UI will update automatically via onSnapshot
     } catch (err: any) {
-      alert(err.message || "Failed to cancel booking");
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to cancel booking",
+        variant: "error",
+      });
     } finally {
       setCancellingId(null);
+      setBookingToCancel(null);
     }
   };
 
@@ -77,26 +139,65 @@ const AdminBookings = () => {
 
   return (
     <div className="space-y-8">
+      <ConfirmationModal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={confirmClearBookings}
+        title="Clear All Bookings"
+        message="Are you sure you want to delete ALL bookings? This will reset all event booked seats to 0."
+        confirmText="Clear All"
+        variant="danger"
+        isLoading={clearing}
+      />
+      <ConfirmationModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={confirmCancelBooking}
+        title="Cancel Booking"
+        message="Are you sure you want to cancel this booking? This will refund the credits to the user."
+        confirmText="Cancel Booking"
+        variant="danger"
+        isLoading={!!cancellingId}
+      />
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.variant}
+      />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-serif text-neutral-900 uppercase tracking-widest">Manage Bookings</h1>
         
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-          <input 
-            type="text"
-            placeholder="Search by email or event..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 transition-colors w-full md:w-64"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleClearBookings}
+            disabled={clearing}
+            className="border border-amber-200 text-amber-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-50 transition-all flex items-center disabled:opacity-50"
+            title="Clear all bookings and reset event seats"
+          >
+            <Eraser className="w-3 h-3 mr-2" />
+            Clear Bookings
+          </button>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <input 
+              type="text"
+              placeholder="Search by email or event..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 transition-colors w-full md:w-64"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

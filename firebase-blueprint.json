@@ -26,7 +26,7 @@
         "description": { "type": "string" },
         "dateTime": { "type": "string", "format": "date-time" },
         "capacity": { "type": "number" },
-        "type": { "type": "string", "enum": ["thali", "curated"] },
+        "type": { "type": "string", "enum": ["thali", "curated", "brunch"] },
         "creditsPerPerson": { "type": "number" }
       },
       "required": ["title", "dateTime", "capacity", "type", "creditsPerPerson"]

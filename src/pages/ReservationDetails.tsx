@@ -8,6 +8,7 @@ import { format, parseISO, differenceInDays } from "date-fns";
 import { motion } from "motion/react";
 import { Calendar, Clock, Users, ArrowLeft, AlertCircle, Info, Trash2, Edit3 } from "lucide-react";
 import { generateAutoEvents } from "../lib/eventUtils";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 const ReservationDetails = () => {
   const { bookingId } = useParams();
@@ -19,6 +20,7 @@ const ReservationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,8 +63,12 @@ const ReservationDetails = () => {
     const daysUntilEvent = differenceInDays(parseISO(event.dateTime), new Date());
     if (daysUntilEvent < 14) return;
 
-    if (!window.confirm("Are you sure you would like to cancel this reservation?")) return;
+    setShowCancelModal(true);
+  };
 
+  const confirmCancel = async () => {
+    if (!booking || !event || !user) return;
+    setShowCancelModal(false);
     setCancelling(true);
     try {
       await runTransaction(db, async (transaction) => {
@@ -119,6 +125,17 @@ const ReservationDetails = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50 py-24">
+      <ConfirmationModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={confirmCancel}
+        title="Cancel Reservation"
+        message="Are you sure you would like to cancel this reservation? This action will refund your credits."
+        confirmText="Yes, Cancel"
+        cancelText="No, Keep it"
+        variant="danger"
+        isLoading={cancelling}
+      />
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-8">
           <Link 

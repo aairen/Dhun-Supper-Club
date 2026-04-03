@@ -1,7 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import dotenv from "dotenv";
@@ -9,8 +8,26 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { differenceInDays, parseISO, startOfDay, format } from "date-fns";
 import { Resend } from "resend";
+import fs from "fs";
 
 dotenv.config();
+
+// Log environment variables for debugging (redacted for security where appropriate)
+console.log("[ENV CHECK] VITE_FIREBASE_PROJECT_ID:", process.env.VITE_FIREBASE_PROJECT_ID || "Not Set");
+console.log("[ENV CHECK] VITE_FIREBASE_FIRESTORE_DATABASE_ID:", process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "Not Set");
+console.log("[ENV CHECK] APP_URL:", process.env.APP_URL || "Not Set");
+
+const firebaseConfig = {
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)",
+};
+
+// Helper to check for placeholder values
+const isPlaceholder = (val: string | undefined) => {
+  if (!val) return true;
+  const upper = val.toUpperCase();
+  return upper.includes("YOUR_") || upper.includes("MY_") || upper === "TODO";
+};
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 console.log(`[RESEND STATUS] ${resend ? "Initialized" : "Not Initialized (Missing API Key)"}`);
@@ -58,42 +75,45 @@ let adminApp: admin.app.App | null = null;
 let db: any = null;
 
 async function getDb() {
-  if (!db) {
-    let projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
-    let databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
-    
-    // Fallback to config file if env vars are missing
-    try {
-      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-      const config = JSON.parse(await fs.promises.readFile(configPath, "utf-8"));
-      if (!projectId) projectId = config.projectId;
-      if (databaseId === "(default)") databaseId = config.firestoreDatabaseId || "(default)";
-      console.log("[FIREBASE ADMIN] Loaded config from firebase-applet-config.json");
-    } catch (err) {
-      // Ignore if file doesn't exist
-    }
-    
-    if (!projectId) {
-      console.error("[FIREBASE ADMIN] CRITICAL: Project ID is missing!");
-    }
-    
-    console.log(`[FIREBASE ADMIN] Initializing with Project: ${projectId}, Database: ${databaseId}`);
+  if (!adminApp) {
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
     
     try {
-      if (!adminApp) {
-        adminApp = admin.initializeApp({
-          credential: admin.credential.applicationDefault(),
-          projectId: projectId,
-        });
+      // If projectId is a placeholder or missing, let it auto-discover
+      if (isPlaceholder(projectId)) {
+        console.log(`[FIREBASE ADMIN] Initializing with AUTO-DISCOVERY (Project ID was placeholder or missing)`);
+        adminApp = admin.initializeApp();
+      } else {
+        console.log(`[FIREBASE ADMIN] Initializing with projectId: ${projectId}`);
+        adminApp = admin.initializeApp({ projectId });
       }
-      // For firebase-admin, getFirestore can take the app and databaseId
-      db = getFirestore(adminApp, databaseId);
-      
-      // Test connectivity
-      await db.collection("health").doc("check").set({ lastCheck: new Date().toISOString() }, { merge: true });
-      console.log("[FIREBASE ADMIN] Connectivity test successful");
+      console.log(`[FIREBASE ADMIN] Initialized successfully`);
+    } catch (err: any) {
+      if (err.code === 'app/duplicate-app') {
+        adminApp = admin.app();
+        console.log(`[FIREBASE ADMIN] Using existing app`);
+      } else {
+        console.error(`[FIREBASE ADMIN] Initialization failed:`, err);
+        throw err;
+      }
+    }
+  }
+
+  if (!db) {
+    // In Cloud Run, the default database is used if no ID is provided
+    let dbId = firebaseConfig.firestoreDatabaseId;
+    
+    // Normalize dbId: treat "(default)" or placeholders as undefined
+    if (dbId === "(default)" || isPlaceholder(dbId)) {
+      dbId = undefined;
+    }
+
+    console.log(`[FIREBASE ADMIN] Getting Firestore for database: ${dbId || "(default)"}`);
+    try {
+      db = getFirestore(adminApp!, dbId);
+      console.log(`[FIREBASE ADMIN] Firestore instance obtained`);
     } catch (err) {
-      console.error("[FIREBASE ADMIN] Initialization/Connectivity error:", err);
+      console.error(`[FIREBASE ADMIN] Failed to get Firestore:`, err);
       throw err;
     }
   }
@@ -286,7 +306,8 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
-      await admin.auth().verifyIdToken(idToken);
+      await getDb();
+      await adminApp!.auth().verifyIdToken(idToken);
     } catch (error) {
       return res.status(401).json({ error: "Invalid token" });
     }
@@ -533,6 +554,164 @@ async function startServer() {
 
   startReminderJob();
 
+  // Admin API: Delete Event and Refund
+  app.post("/api/admin/delete-event", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      console.log(`[ADMIN API] delete-event attempt by ${decodedToken.email} (${decodedToken.uid})`);
+      
+      // Verify caller is admin
+      let callerSnap;
+      try {
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        throw fsErr;
+      }
+      
+      const callerData = callerSnap.data();
+      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const { eventId } = req.body;
+      if (!eventId) {
+        return res.status(400).json({ error: "Event ID is required" });
+      }
+
+      const eventRef = db.collection("events").doc(eventId);
+      const eventSnap = await eventRef.get();
+      if (!eventSnap.exists) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // 1. Find all bookings for this event
+      const bookingsSnap = await db.collection("bookings").where("eventId", "==", eventId).get();
+      
+      await db.runTransaction(async (transaction: any) => {
+        // 2. Refund each booking
+        for (const bDoc of bookingsSnap.docs) {
+          const bookingData = bDoc.data();
+          const userRef = db.collection("users").doc(bookingData.userId);
+          const uSnap = await transaction.get(userRef);
+          
+          if (uSnap.exists) {
+            const currentCredits = uSnap.data().credits || 0;
+            transaction.update(userRef, {
+              credits: currentCredits + bookingData.totalCredits
+            });
+
+            // Log refund transaction
+            const transRef = db.collection("transactions").doc();
+            transaction.set(transRef, {
+              userId: bookingData.userId,
+              amount: 0,
+              creditsIssued: bookingData.totalCredits,
+              type: "refund",
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              bookingId: bDoc.id,
+              eventId: eventId,
+              reason: "Event deleted by admin"
+            });
+          }
+          
+          // Delete booking
+          transaction.delete(bDoc.ref);
+        }
+
+        // 3. Delete the event
+        transaction.delete(eventRef);
+      });
+
+      res.json({ success: true, message: `Event deleted and ${bookingsSnap.size} bookings refunded` });
+    } catch (error: any) {
+      console.error("Admin delete-event error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin API: Delete ALL Events and Refund
+  app.post("/api/admin/delete-all-events", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      console.log(`[ADMIN API] delete-all-events attempt by ${decodedToken.email} (${decodedToken.uid})`);
+      
+      // Verify caller is admin
+      let callerSnap;
+      try {
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        throw fsErr;
+      }
+      
+      const callerData = callerSnap.data();
+      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const eventsSnap = await db.collection("events").get();
+      const bookingsSnap = await db.collection("bookings").get();
+
+      let refundCount = 0;
+      for (const bDoc of bookingsSnap.docs) {
+        const bookingData = bDoc.data();
+        const userRef = db.collection("users").doc(bookingData.userId);
+        
+        await db.runTransaction(async (transaction: any) => {
+          const uSnap = await transaction.get(userRef);
+          if (uSnap.exists) {
+            const currentCredits = uSnap.data().credits || 0;
+            transaction.update(userRef, {
+              credits: currentCredits + bookingData.totalCredits
+            });
+
+            const transRef = db.collection("transactions").doc();
+            transaction.set(transRef, {
+              userId: bookingData.userId,
+              amount: 0,
+              creditsIssued: bookingData.totalCredits,
+              type: "refund",
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              bookingId: bDoc.id,
+              eventId: bookingData.eventId,
+              reason: "All events cleared by admin"
+            });
+          }
+          transaction.delete(bDoc.ref);
+        });
+        refundCount++;
+      }
+
+      const batch = db.batch();
+      eventsSnap.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      res.json({ success: true, message: `All ${eventsSnap.size} events deleted and ${refundCount} bookings refunded` });
+    } catch (error: any) {
+      console.error("Admin delete-all-events error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin API: Set User Role
   app.post("/api/admin/set-role", async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -542,12 +721,24 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
       const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      console.log(`[ADMIN API] set-role attempt by ${decodedToken.email} (${decodedToken.uid})`);
       
       // Verify caller is admin
-      const callerSnap = await db.collection("users").doc(decodedToken.uid).get();
-      if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+      let callerSnap;
+      try {
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        throw fsErr;
+      }
+      
+      const callerData = callerSnap.data();
+      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+
+      if (!isAdmin) {
+        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin. Role found: ${callerData?.role}`);
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
 
@@ -563,11 +754,7 @@ async function startServer() {
       }
 
       await targetRef.update({ role });
-      
-      // Set custom claims for the user
-      await admin.auth().setCustomUserClaims(targetUid, { role });
-      
-      res.json({ success: true, message: `User role updated to ${role} (including custom claims)` });
+      res.json({ success: true, message: `User role updated to ${role}` });
     } catch (error: any) {
       console.error("Admin set-role error:", error);
       res.status(500).json({ error: error.message });
@@ -583,20 +770,24 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
       const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      console.log(`[ADMIN API] cancel-booking attempt by ${decodedToken.email} (${decodedToken.uid})`);
       
-      console.log(`[ADMIN CANCEL] Caller: ${decodedToken.uid}, Booking: ${req.body.bookingId}`);
-
       // Verify caller is admin
-      const callerSnap = await db.collection("users").doc(decodedToken.uid).get();
-      if (!callerSnap.exists) {
-        console.error(`[ADMIN CANCEL] Caller profile not found: ${decodedToken.uid}`);
-        return res.status(403).json({ error: "Forbidden: User profile not found" });
+      let callerSnap;
+      try {
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid}:`, fsErr);
+        throw fsErr;
       }
       
-      if (callerSnap.data().role !== "admin") {
-        console.error(`[ADMIN CANCEL] Caller is not an admin: ${decodedToken.uid}, Role: ${callerSnap.data().role}`);
+      const callerData = callerSnap.data();
+      const isAdmin = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
+
+      if (!isAdmin) {
+        console.log(`[ADMIN CHECK FAILED] User ${decodedToken.email} (${decodedToken.uid}) is not an admin. Role found: ${callerData?.role}`);
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
 

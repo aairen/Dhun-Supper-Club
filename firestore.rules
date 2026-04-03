@@ -35,17 +35,17 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-             (request.auth.token.role == 'admin' || 
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'credits', 'role']) &&
              data.credits is number &&
              data.role in ['user', 'admin', 'member'] &&
-             data.email is string &&
-             (!('firstName' in data) || data.firstName is string) &&
-             (!('lastName' in data) || data.lastName is string) &&
+             data.email is string && data.email.size() < 255 &&
+             (!('firstName' in data) || (data.firstName is string && data.firstName.size() < 100)) &&
+             (!('lastName' in data) || (data.lastName is string && data.lastName.size() < 100)) &&
              (!('membershipProgress' in data) || data.membershipProgress is number) &&
              (!('membershipYear' in data) || data.membershipYear is number) &&
              (!('notificationPrefs' in data) || data.notificationPrefs is map) &&
@@ -55,15 +55,18 @@ service cloud.firestore {
     function isValidEvent(data) {
       return data.keys().hasAll(['title', 'dateTime', 'capacity', 'type', 'creditsPerPerson']) &&
              data.capacity is number && data.creditsPerPerson is number &&
-             data.title is string && data.type in ['thali', 'curated', 'brunch'] &&
+             data.title is string && data.title.size() < 200 &&
+             data.type in ['thali', 'curated', 'brunch', 'hands-on'] &&
              (!('bookedSeats' in data) || data.bookedSeats is number) &&
-             (!('description' in data) || data.description is string);
+             (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() < 100));
     }
 
     function isValidBooking(data) {
       return data.keys().hasAll(['userId', 'eventId', 'numPeople', 'totalCredits', 'createdAt']) &&
              data.numPeople is number && data.totalCredits is number &&
-             data.userId == request.auth.uid;
+             (data.userId == request.auth.uid || isAdmin());
     }
 
     // ===============================================================
@@ -71,8 +74,7 @@ service cloud.firestore {
     // ===============================================================
     
     match /users/{userId} {
-      allow read: if isAuthenticated() && request.auth.uid == userId;
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
       allow update: if isAuthenticated() && (
         (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])) || 
@@ -89,7 +91,7 @@ service cloud.firestore {
     
     match /bookings/{bookingId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidBooking(request.resource.data);
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin()) && isValidBooking(request.resource.data);
       allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin()) && isValidBooking(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }

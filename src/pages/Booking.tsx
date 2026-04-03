@@ -89,84 +89,27 @@ const Booking = () => {
     setError("");
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, "users", user.uid);
-        const eventRef = doc(db, "events", event.id);
-        
-        // 1. READS FIRST
-        const eSnap = await transaction.get(eventRef);
-        const uSnap = await transaction.get(userRef);
-        
-        if (!uSnap.exists()) throw new Error("User profile not found");
-
-        const seatDifference = numPeople - (existingBooking?.numPeople || 0);
-        let currentBookedSeats = 0;
-
-        if (eSnap.exists()) {
-          currentBookedSeats = eSnap.data().bookedSeats || 0;
-        } else if (event) {
-          currentBookedSeats = 0;
-        } else {
-          throw new Error("Event not found");
-        }
-
-        if (currentBookedSeats + seatDifference > event.capacity) {
-          throw new Error("Sorry, this event has reached capacity for the selected number of guests.");
-        }
-
-        // 2. WRITES SECOND
-        // Update User Credits and Membership Progress
-        const uData = uSnap.data();
-        const currentProgress = uData.membershipProgress || 0;
-        const newProgress = currentProgress + creditDifference;
-
-        const userUpdate: any = {
-          credits: increment(-creditDifference),
-          membershipProgress: increment(creditDifference),
-        };
-
-        // Upgrade to Member if progress reaches 20
-        if (newProgress >= 20 && uData.role === 'user') {
-          userUpdate.role = 'member';
-        } else if (newProgress < 20 && uData.role === 'member') {
-          // Revert to Guest if progress falls below 20 (e.g. when editing to a smaller party)
-          userUpdate.role = 'user';
-        }
-
-        transaction.update(userRef, userUpdate);
-
-        // Update Event Capacity
-        if (eSnap.exists()) {
-          transaction.update(eventRef, {
-            bookedSeats: increment(seatDifference),
-          });
-        } else {
-          // Initialize auto-event in Firestore
-          transaction.set(eventRef, {
-            ...event,
-            bookedSeats: seatDifference
-          });
-        }
-
-        // 3. Create or Update Booking
-        if (existingBooking) {
-          const bRef = doc(db, "bookings", existingBooking.id);
-          transaction.update(bRef, {
-            numPeople,
-            totalCredits,
-            updatedAt: new Date().toISOString(),
-          });
-        } else {
-          const bRef = doc(collection(db, "bookings"));
-          transaction.set(bRef, {
-            userId: user.uid,
-            eventId: event.id,
-            numPeople,
-            totalCredits,
-            createdAt: new Date().toISOString(),
-          });
-        }
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/book-event", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          numPeople,
+          // If it's an auto-event, we might need to pass its data to initialize it
+          // But for now, we assume the backend handles it or the event exists
+          eventData: event // Optional: in case backend needs to initialize it
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to process booking");
+      }
 
       // Send confirmation email if enabled
       if (profile.notificationPrefs?.confirmations !== false) {

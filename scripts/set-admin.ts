@@ -16,8 +16,8 @@ const adminApp = admin.initializeApp({
   projectId: process.env.VITE_FIREBASE_PROJECT_ID,
 });
 
-const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
-const db = getFirestore(adminApp, databaseId);
+const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+const db = getFirestore(adminApp, databaseId === "(default)" ? undefined : databaseId);
 
 async function setAdmin() {
   try {

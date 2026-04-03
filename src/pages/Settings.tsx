@@ -160,10 +160,17 @@ const SettingsPage = () => {
       // 3. Delete from Auth
       await deleteUser(user);
       
-      // 4. Redirect to homepage
+      // 4. Explicit logout
+      await auth.signOut();
+      
+      // 5. Redirect to homepage
       window.location.href = "/";
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === "auth/requires-recent-login") {
+        setError("For security reasons, you must re-authenticate before deleting your account. Please log out and log back in, then try again.");
+      } else {
+        setError(err.message);
+      }
       setLoading(false);
     }
   };

@@ -21,7 +21,6 @@ const Navbar = () => {
         setIsProfileOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -79,59 +78,62 @@ const Navbar = () => {
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center space-x-2 text-sm font-medium text-neutral-900 hover:text-neutral-600 transition-colors"
+                  className="flex flex-col items-end group"
                 >
-                  <div className="flex flex-col items-end">
+                  <div className="flex items-center space-x-2 text-sm font-medium text-neutral-900 group-hover:text-neutral-600 transition-colors">
                     <span>Hello, {profile?.firstName || "User"}</span>
-                    {isAdmin && <span className="text-[10px] text-red-600 font-bold uppercase tracking-tighter">Admin</span>}
+                    <User className="w-4 h-4" />
                   </div>
-                  <User className="w-4 h-4" />
+                  {isAdmin && (
+                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider leading-none mt-0.5">
+                      Admin
+                    </span>
+                  )}
                 </button>
 
                 <AnimatePresence>
                   {isProfileOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-xl py-2"
-                      >
-                        {!isAdmin && (
-                          <Link
-                            to="/dashboard"
-                            className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                            onClick={() => setIsProfileOpen(false)}
-                          >
-                            <LayoutDashboard className="w-4 h-4 mr-2" />
-                            Dashboard
-                          </Link>
-                        )}
-                        {isAdmin && (
-                          <Link
-                            to="/admin"
-                            className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                            onClick={() => setIsProfileOpen(false)}
-                          >
-                            <Settings className="w-4 h-4 mr-2" />
-                            Admin
-                          </Link>
-                        )}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-xl py-2"
+                    >
+                      {!isAdmin ? (
                         <Link
-                          to="/settings"
+                          to="/dashboard"
                           className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
                           onClick={() => setIsProfileOpen(false)}
                         >
-                          <Settings className="w-4 h-4 mr-2" />
-                          Settings
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Dashboard
                         </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-neutral-50"
+                      ) : (
+                        <Link
+                          to="/admin"
+                          className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                          onClick={() => setIsProfileOpen(false)}
                         >
-                          <LogOut className="w-4 h-4 mr-2" />
-                          Logout
-                        </button>
-                      </motion.div>
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Admin
+                        </Link>
+                      )}
+                      <Link
+                        to="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                        onClick={() => setIsProfileOpen(false)}
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-neutral-50"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
+                      </button>
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -199,7 +201,7 @@ const Navbar = () => {
                   </div>
 
                   <div className="space-y-6">
-                    {!isAdmin && (
+                    {!isAdmin ? (
                       <Link
                         to="/dashboard"
                         onClick={() => setIsOpen(false)}
@@ -207,8 +209,7 @@ const Navbar = () => {
                       >
                         Dashboard
                       </Link>
-                    )}
-                    {isAdmin && (
+                    ) : (
                       <Link
                         to="/admin"
                         onClick={() => setIsOpen(false)}

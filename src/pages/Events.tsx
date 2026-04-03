@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { DiningEvent, Booking } from "../types";
-import { generateAutoEvents } from "../lib/eventUtils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -19,8 +18,6 @@ const Events = () => {
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
 
   useEffect(() => {
-    const autoEvents = generateAutoEvents();
-    
     const q = query(collection(db, "events"), orderBy("dateTime", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const firestoreEvents = snapshot.docs.map(doc => ({
@@ -28,14 +25,10 @@ const Events = () => {
         ...doc.data()
       })) as DiningEvent[];
       
-      const merged = [...autoEvents];
-      firestoreEvents.forEach(fe => {
-        const index = merged.findIndex(me => me.id === fe.id);
-        if (index !== -1) merged[index] = fe;
-        else merged.push(fe);
-      });
-      
-      setEvents(merged.sort((a, b) => parseISO(a.dateTime).getTime() - parseISO(b.dateTime).getTime()));
+      setEvents(firestoreEvents);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching events:", error);
       setLoading(false);
     });
 
@@ -101,7 +94,7 @@ const Events = () => {
         <div className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex flex-wrap items-center gap-2">
-              {["Thali", "Brunch", "Curated"].map((type) => (
+              {["Thali", "Brunch", "Curated", "Hands-On"].map((type) => (
                 <button
                   key={type}
                   onClick={() => toggleFilter(type)}
@@ -150,7 +143,8 @@ const Events = () => {
             const eventImages: Record<string, string> = {
               thali: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&q=80&w=800",
               brunch: "https://images.unsplash.com/photo-1513442542250-854d436a73f2?auto=format&fit=crop&q=80&w=800",
-              curated: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=800"
+              curated: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=800",
+              "hands-on": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800"
             };
             
             return (

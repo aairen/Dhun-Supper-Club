@@ -15,7 +15,7 @@ export interface UserProfile {
   };
 }
 
-export type EventType = "thali" | "curated" | "brunch";
+export type EventType = "thali" | "curated" | "brunch" | "hands-on";
 
 export interface DiningEvent {
   id: string;
@@ -26,6 +26,7 @@ export interface DiningEvent {
   type: EventType;
   creditsPerPerson: number;
   bookedSeats: number;
+  imageUrl?: string;
 }
 
 export interface Booking {

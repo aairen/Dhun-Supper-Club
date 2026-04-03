@@ -2,13 +2,31 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, orderBy, limit, startAfter, getDocs } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { UserProfile } from "../../types";
-import { Search, X, Loader2, User, Mail, Shield, ShieldAlert, DollarSign, Calendar } from "lucide-react";
+import { Search, X, Loader2, User, Mail, Shield, ShieldAlert, DollarSign, Calendar, MoreVertical, UserPlus, UserMinus } from "lucide-react";
+import { cn } from "../../lib/utils";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { AlertModal } from "../../components/AlertModal";
 
 const AdminUsers = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, user: UserProfile } | null>(null);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleTarget, setRoleTarget] = useState<{ uid: string; currentRole: string } | null>(null);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; title: string; message: string; variant: "error" | "info" | "success" }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "info",
+  });
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, "users"), orderBy("email", "asc"));
@@ -19,14 +37,22 @@ const AdminUsers = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleToggleAdmin = async (targetUid: string, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    const confirmMsg = newRole === "admin" 
-      ? "Are you sure you want to make this user an admin?" 
-      : "Are you sure you want to remove admin privileges from this user?";
-    
-    if (!window.confirm(confirmMsg)) return;
+  const handleContextMenu = (e: React.MouseEvent, user: UserProfile) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, user });
+  };
 
+  const handleToggleAdmin = async (targetUid: string, currentRole: string) => {
+    setRoleTarget({ uid: targetUid, currentRole });
+    setShowRoleModal(true);
+  };
+
+  const confirmToggleAdmin = async () => {
+    if (!roleTarget) return;
+    const { uid: targetUid, currentRole } = roleTarget;
+    const newRole = currentRole === "admin" ? "user" : "admin";
+    
+    setShowRoleModal(false);
     setUpdatingId(targetUid);
     try {
       const user = auth.currentUser;
@@ -49,9 +75,15 @@ const AdminUsers = () => {
       
       // The UI will update automatically via onSnapshot
     } catch (err: any) {
-      alert(err.message || "Failed to update role");
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to update role",
+        variant: "error",
+      });
     } finally {
       setUpdatingId(null);
+      setRoleTarget(null);
     }
   };
 
@@ -62,6 +94,25 @@ const AdminUsers = () => {
 
   return (
     <div className="space-y-8">
+      <ConfirmationModal
+        isOpen={showRoleModal}
+        onClose={() => setShowRoleModal(false)}
+        onConfirm={confirmToggleAdmin}
+        title="Update User Role"
+        message={roleTarget?.currentRole === "admin" 
+          ? "Are you sure you want to remove admin privileges from this user?" 
+          : "Are you sure you want to make this user an admin?"}
+        confirmText="Update Role"
+        variant={roleTarget?.currentRole === "admin" ? "danger" : "info"}
+        isLoading={!!updatingId}
+      />
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.variant}
+      />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-serif text-neutral-900 uppercase tracking-widest">Manage Users</h1>
         
@@ -92,19 +143,22 @@ const AdminUsers = () => {
               <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">User</th>
               <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Role</th>
               <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Credits</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Membership</th>
-              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
+              <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Membership Year</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center">
+                <td colSpan={4} className="px-6 py-12 text-center">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
                 </td>
               </tr>
             ) : filteredUsers.map(user => (
-              <tr key={user.uid} className="hover:bg-neutral-50 transition-colors">
+              <tr 
+                key={user.uid} 
+                className="hover:bg-neutral-50 transition-colors cursor-context-menu"
+                onContextMenu={(e) => handleContextMenu(e, user)}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center">
                     <div className="w-8 h-8 bg-neutral-100 rounded-full flex items-center justify-center mr-3">
@@ -124,9 +178,11 @@ const AdminUsers = () => {
                 <td className="px-6 py-4">
                   <span className={cn(
                     "px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full",
-                    user.role === "admin" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"
+                    user.role === "admin" ? "bg-red-100 text-red-600" : 
+                    user.role === "member" ? "bg-neutral-900 text-white" : 
+                    "bg-neutral-100 text-neutral-600"
                   )}>
-                    {user.role}
+                    {user.role === "admin" ? "Admin" : user.role === "member" ? "Member" : "User"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-neutral-500">
@@ -141,23 +197,11 @@ const AdminUsers = () => {
                     {user.membershipYear || "N/A"}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <button 
-                    onClick={() => handleToggleAdmin(user.uid, user.role)}
-                    disabled={updatingId === user.uid}
-                    className={cn(
-                      "text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50",
-                      user.role === "admin" ? "text-red-600 hover:text-red-800" : "text-neutral-900 hover:text-neutral-600"
-                    )}
-                  >
-                    {updatingId === user.uid ? "Updating..." : user.role === "admin" ? "Remove Admin" : "Make Admin"}
-                  </button>
-                </td>
               </tr>
             ))}
             {!loading && filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
+                <td colSpan={4} className="px-6 py-12 text-center text-neutral-400 italic">
                   No users found.
                 </td>
               </tr>
@@ -165,10 +209,46 @@ const AdminUsers = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div 
+          className="fixed z-[100] bg-white border border-neutral-200 shadow-xl rounded-lg py-2 w-48 animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-2 border-b border-neutral-100 mb-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Actions</p>
+            <p className="text-xs font-medium text-neutral-900 truncate">{contextMenu.user.firstName} {contextMenu.user.lastName}</p>
+          </div>
+          
+          <button
+            onClick={() => {
+              handleToggleAdmin(contextMenu.user.uid, contextMenu.user.role);
+              setContextMenu(null);
+            }}
+            disabled={updatingId === contextMenu.user.uid || contextMenu.user.uid === auth.currentUser?.uid}
+            className={cn(
+              "w-full flex items-center px-4 py-2 text-sm transition-colors hover:bg-neutral-50 disabled:opacity-50",
+              contextMenu.user.role === "admin" ? "text-red-600" : "text-neutral-700"
+            )}
+          >
+            {contextMenu.user.role === "admin" ? (
+              <>
+                <UserMinus className="w-4 h-4 mr-2" />
+                Remove Admin
+              </>
+            ) : (
+              <>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Make Admin
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
-
-const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
 export default AdminUsers;
