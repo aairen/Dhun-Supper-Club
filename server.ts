@@ -137,6 +137,85 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Stripe webhook must read the raw body for signature verification.
+  // Register before express.json() so the JSON parser does not consume the body.
+  app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"] as string;
+    let event;
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("STRIPE_WEBHOOK_SECRET is not set");
+      return res.status(500).json({ error: "Webhook secret not configured" });
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        webhookSecret
+      );
+    } catch (err: any) {
+      console.error(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const { userId, credits, bonus } = session.metadata || {};
+
+      if (userId && credits) {
+        try {
+          const db = await getDb();
+          const userRef = db.collection("users").doc(userId);
+          const totalCredits = parseInt(credits) + (parseInt(bonus || "0"));
+
+          // Check if this session has already been processed to avoid double-crediting
+          const processedRef = db.collection("processed_sessions").doc(session.id);
+          const processedSnap = await processedRef.get();
+
+          if (!processedSnap.exists) {
+            await db.runTransaction(async (transaction: any) => {
+              const uSnap = await transaction.get(userRef);
+              if (!uSnap.exists) throw new Error("User not found");
+              
+              const currentCredits = uSnap.data().credits || 0;
+              transaction.update(userRef, {
+                credits: currentCredits + totalCredits
+              });
+
+              // Mark session as processed
+              transaction.set(processedRef, {
+                processedAt: admin.firestore.FieldValue.serverTimestamp(),
+                userId,
+                totalCredits
+              });
+
+              // Log transaction
+              const transRef = db.collection("transactions").doc();
+              transaction.set(transRef, {
+                userId,
+                amount: session.amount_total ? session.amount_total / 100 : 0,
+                creditsIssued: totalCredits,
+                type: "purchase",
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                stripeSessionId: session.id
+              });
+            });
+
+            console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
+          } else {
+            console.log(`[STRIPE WEBHOOK] Session ${session.id} already processed`);
+          }
+        } catch (error) {
+          console.error("Error updating user credits from webhook:", error);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  });
+
   // Middleware for JSON parsing
   app.use(express.json());
 
@@ -221,84 +300,6 @@ async function startServer() {
       console.error("Session verification error:", error);
       res.status(500).json({ error: error.message });
     }
-  });
-
-  // Stripe Webhook
-  app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"] as string;
-    let event;
-
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.error("STRIPE_WEBHOOK_SECRET is not set");
-      return res.status(500).json({ error: "Webhook secret not configured" });
-    }
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        webhookSecret
-      );
-    } catch (err: any) {
-      console.error(`Webhook Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const { userId, credits, bonus } = session.metadata || {};
-
-      if (userId && credits) {
-        try {
-          const db = await getDb();
-          const userRef = db.collection("users").doc(userId);
-          const totalCredits = parseInt(credits) + (parseInt(bonus || "0"));
-
-          // Check if this session has already been processed to avoid double-crediting
-          const processedRef = db.collection("processed_sessions").doc(session.id);
-          const processedSnap = await processedRef.get();
-
-          if (!processedSnap.exists) {
-            await db.runTransaction(async (transaction: any) => {
-              const uSnap = await transaction.get(userRef);
-              if (!uSnap.exists) throw new Error("User not found");
-              
-              const currentCredits = uSnap.data().credits || 0;
-              transaction.update(userRef, {
-                credits: currentCredits + totalCredits
-              });
-
-              // Mark session as processed
-              transaction.set(processedRef, {
-                processedAt: admin.firestore.FieldValue.serverTimestamp(),
-                userId,
-                totalCredits
-              });
-
-              // Log transaction
-              const transRef = db.collection("transactions").doc();
-              transaction.set(transRef, {
-                userId,
-                amount: session.amount_total ? session.amount_total / 100 : 0,
-                creditsIssued: totalCredits,
-                type: "purchase",
-                timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                stripeSessionId: session.id
-              });
-            });
-
-            console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
-          } else {
-            console.log(`[STRIPE WEBHOOK] Session ${session.id} already processed`);
-          }
-        } catch (error) {
-          console.error("Error updating user credits from webhook:", error);
-        }
-      }
-    }
-
-    res.json({ received: true });
   });
 
   // API: Book Event

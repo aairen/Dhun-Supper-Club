@@ -29,72 +29,93 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    let profileUnsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        // Listen to profile changes
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        
-        // Check if profile exists, if not create it
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            credits: 0,
-            role: "user",
-            membershipProgress: 0,
-            membershipYear: 0,
-            notificationPrefs: {
-              confirmations: true,
-              reminders: true,
-            },
-          };
-          try {
-            await setDoc(userDocRef, newProfile);
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, `users/${firebaseUser.uid}`);
-          }
-        }
+      profileUnsubscribe?.();
+      profileUnsubscribe = undefined;
 
-        const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            
-            // Membership Auto-Update: Spend 20+ credits -> Member
-            if (data.membershipProgress >= 20 && data.role === 'user') {
-              try {
-                await updateDoc(userDocRef, { role: 'member' });
-              } catch (err) {
-                console.error("Membership update error:", err);
-              }
-            } else if (data.membershipProgress < 20 && data.role === 'member') {
-              // Revert to Guest if progress falls below 20
-              try {
-                await updateDoc(userDocRef, { role: 'user' });
-              } catch (err) {
-                console.error("Membership downgrade error:", err);
-              }
-            }
-
-            setProfile(data);
-            console.log("Profile updated:", data.uid, "Role:", data.role);
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Profile fetch error:", error);
-          setLoading(false);
-        });
-
-        return () => unsubscribeProfile();
-      } else {
+      if (!firebaseUser) {
         setProfile(null);
         setLoading(false);
+        return;
       }
+
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+
+      void (async () => {
+        try {
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              credits: 0,
+              role: "user",
+              membershipProgress: 0,
+              membershipYear: 0,
+              notificationPrefs: {
+                confirmations: true,
+                reminders: true,
+              },
+            };
+            try {
+              await setDoc(userDocRef, newProfile);
+            } catch (err) {
+              handleFirestoreError(err, OperationType.WRITE, `users/${firebaseUser.uid}`);
+            }
+          }
+        } catch (err) {
+          console.error("Profile bootstrap error:", err);
+          if (!cancelled) setLoading(false);
+          return;
+        }
+
+        if (cancelled) return;
+
+        profileUnsubscribe = onSnapshot(
+          userDocRef,
+          async (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data() as UserProfile;
+
+              if (data.membershipProgress >= 20 && data.role === "user") {
+                try {
+                  await updateDoc(userDocRef, { role: "member" });
+                } catch (err) {
+                  console.error("Membership update error:", err);
+                }
+              } else if (data.membershipProgress < 20 && data.role === "member") {
+                try {
+                  await updateDoc(userDocRef, { role: "user" });
+                } catch (err) {
+                  console.error("Membership downgrade error:", err);
+                }
+              }
+
+              setProfile(data);
+              console.log("Profile updated:", data.uid, "Role:", data.role);
+            }
+            setLoading(false);
+          },
+          (error) => {
+            console.error("Profile fetch error:", error);
+            setLoading(false);
+          }
+        );
+      })().catch((err) => {
+        console.error("Auth profile init error:", err);
+        if (!cancelled) setLoading(false);
+      });
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      cancelled = true;
+      profileUnsubscribe?.();
+      unsubscribeAuth();
+    };
   }, []);
 
   const isAdmin = profile?.role === "admin";
