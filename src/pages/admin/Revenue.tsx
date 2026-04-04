@@ -21,13 +21,13 @@ const AdminRevenue = () => {
 
   useEffect(() => {
     const q = query(
-      collection(db, "transactions"), 
-      where("type", "==", "purchase"),
+      collection(db, "transactions"),
       orderBy("timestamp", "desc")
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[]);
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Transaction[];
+      setTransactions(all.filter(t => t.type === "purchase"));
       setLoading(false);
     });
     

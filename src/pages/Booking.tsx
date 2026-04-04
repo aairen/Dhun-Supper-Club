@@ -99,9 +99,8 @@ const Booking = () => {
         body: JSON.stringify({
           eventId: event.id,
           numPeople,
-          // If it's an auto-event, we might need to pass its data to initialize it
-          // But for now, we assume the backend handles it or the event exists
-          eventData: event // Optional: in case backend needs to initialize it
+          existingBookingId: existingBooking?.id ?? null,
+          eventData: event
         }),
       });
 
@@ -147,11 +146,11 @@ const Booking = () => {
   };
 
   useEffect(() => {
-    if (searchParams.get("success") === "true" && hasEnoughCredits && !success && !bookingLoading && !autoBookingAttempted.current && event) {
+    if (searchParams.get("success") === "true" && profile && hasEnoughCredits && !success && !bookingLoading && !autoBookingAttempted.current && event) {
       autoBookingAttempted.current = true;
       handleBooking();
     }
-  }, [searchParams, hasEnoughCredits, success, bookingLoading, event]);
+  }, [searchParams, profile, hasEnoughCredits, success, bookingLoading, event]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white text-neutral-900 transition-colors duration-300">Loading Experience...</div>;
   if (!event) return <div className="min-h-screen flex items-center justify-center bg-white text-neutral-900 transition-colors duration-300">Experience not found.</div>;

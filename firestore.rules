@@ -34,7 +34,8 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
     
     function isValidUser(data) {
@@ -72,11 +73,18 @@ service cloud.firestore {
     // ===============================================================
     
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+      );
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
       allow update: if isAuthenticated() && (
-        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role', 'credits'])) || 
-        isAdmin()
+        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])
+          && request.resource.data.role in ['user', 'member']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       ) && isValidUser(request.resource.data);
       allow delete: if isOwner(userId) || isAdmin();
     }

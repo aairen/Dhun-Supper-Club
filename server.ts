@@ -8,7 +8,6 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { differenceInDays, parseISO, startOfDay, format } from "date-fns";
 import { Resend } from "resend";
-import fs from "fs";
 
 dotenv.config();
 
@@ -17,7 +16,17 @@ console.log("[ENV CHECK] VITE_FIREBASE_PROJECT_ID:", process.env.VITE_FIREBASE_P
 console.log("[ENV CHECK] VITE_FIREBASE_FIRESTORE_DATABASE_ID:", process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "Not Set");
 console.log("[ENV CHECK] APP_URL:", process.env.APP_URL || "Not Set");
 
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+const firebaseConfig = {
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)",
+};
+
+console.log("[ENV CHECK] Resolved projectId:", firebaseConfig.projectId);
+
+if (!firebaseConfig.projectId) {
+  console.error("[FATAL] VITE_FIREBASE_PROJECT_ID is not set. Exiting.");
+  process.exit(1);
+}
 
 // Helper to check for placeholder values
 const isPlaceholder = (val: string | undefined) => {
@@ -30,8 +39,7 @@ const isPlaceholder = (val: string | undefined) => {
 const isUserAdmin = (decodedToken: any, callerSnap: any) => {
   const callerData = callerSnap.data();
   const isAdminRole = callerSnap.exists && (callerData?.role?.toLowerCase() === "admin");
-  const isBootstrapAdmin = (decodedToken.email === "airenarjun6@gmail.com" && decodedToken.email_verified);
-  return isAdminRole || isBootstrapAdmin;
+  return isAdminRole;
 };
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -304,7 +312,7 @@ async function startServer() {
     try {
       const db = await getDb();
       const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
-      const { eventId, numPeople } = req.body;
+      const { eventId, numPeople, existingBookingId, eventData } = req.body;
 
       // 1. Get user and event
       const userRef = db.collection("users").doc(decodedToken.uid);
@@ -312,20 +320,47 @@ async function startServer() {
       
       await db.runTransaction(async (transaction: any) => {
         const uSnap = await transaction.get(userRef);
-        const eSnap = await transaction.get(eventRef);
+        let eSnap = await transaction.get(eventRef);
         
         if (!uSnap.exists) throw new Error("User not found");
-        if (!eSnap.exists) throw new Error("Event not found");
+        
+        let eventDataToUse = eSnap.exists ? eSnap.data() : null;
+        if (!eSnap.exists && eventData) {
+          // Initialise the auto-event in Firestore on first booking
+          const { id, ...eventFields } = eventData;
+          transaction.set(eventRef, {
+            ...eventFields,
+            bookedSeats: 0,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          eventDataToUse = { ...eventFields, bookedSeats: 0 };
+        }
+        
+        if (!eventDataToUse) throw new Error("Event not found");
         
         const userData = uSnap.data();
-        const eventData = eSnap.data();
+        
+        let previousCredits = 0;
+        let previousNumPeople = 0;
+
+        if (existingBookingId) {
+          const existingBookingRef = db.collection("bookings").doc(existingBookingId);
+          const existingSnap = await transaction.get(existingBookingRef);
+          if (existingSnap.exists) {
+            previousCredits = existingSnap.data().totalCredits;
+            previousNumPeople = existingSnap.data().numPeople;
+            transaction.delete(existingBookingRef);
+          }
+        }
         
         // 2. Check credits
-        const totalCredits = eventData.creditsPerPerson * numPeople;
-        if (userData.credits < totalCredits) throw new Error("Insufficient credits");
+        const totalCredits = eventDataToUse.creditsPerPerson * numPeople;
+        const creditDifference = totalCredits - previousCredits;
+        if (userData.credits < creditDifference) throw new Error("Insufficient credits");
         
         // 3. Check capacity
-        if ((eventData.bookedSeats || 0) + numPeople > eventData.capacity) throw new Error("Insufficient capacity");
+        const seatsChange = numPeople - previousNumPeople;
+        if ((eventDataToUse.bookedSeats || 0) + seatsChange > eventDataToUse.capacity) throw new Error("Insufficient capacity");
         
         // 4. Create booking
         const bookingRef = db.collection("bookings").doc();
@@ -339,12 +374,12 @@ async function startServer() {
         
         // 5. Update user credits
         transaction.update(userRef, {
-          credits: userData.credits - totalCredits
+          credits: userData.credits - creditDifference
         });
         
         // 6. Update event seats
         transaction.update(eventRef, {
-          bookedSeats: (eventData.bookedSeats || 0) + numPeople
+          bookedSeats: (eventDataToUse.bookedSeats || 0) + seatsChange
         });
         
         // 7. Log transaction
@@ -352,7 +387,7 @@ async function startServer() {
         transaction.set(transRef, {
           userId: decodedToken.uid,
           amount: 0,
-          creditsIssued: -totalCredits,
+          creditsIssued: -creditDifference,
           type: "booking",
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
           bookingId: bookingRef.id,
@@ -549,85 +584,6 @@ async function startServer() {
     }
   });
 
-  // Reminder Job
-  const startReminderJob = async () => {
-    console.log("Starting reminder job...");
-    const db = await getDb();
-    
-    setInterval(async () => {
-      try {
-        const now = new Date();
-        const bookingsSnap = await db.collection("bookings").get();
-        
-        for (const bDoc of bookingsSnap.docs) {
-          const booking = bDoc.data();
-          const eventSnap = await db.collection("events").doc(booking.eventId).get();
-          
-          if (!eventSnap.exists) continue;
-          
-          const event = eventSnap.data();
-          const eventDate = parseISO(event.dateTime);
-          const diffDays = differenceInDays(startOfDay(eventDate), startOfDay(now));
-          
-          const remindersSent = booking.remindersSent || {};
-          let timeFrame = "";
-          let reminderKey = "";
-
-          if (diffDays === 14 && !remindersSent.twoWeeks) {
-            timeFrame = "in 2 weeks";
-            reminderKey = "twoWeeks";
-          } else if (diffDays === 7 && !remindersSent.oneWeek) {
-            timeFrame = "in 1 week";
-            reminderKey = "oneWeek";
-          } else if (diffDays === 0 && !remindersSent.dayOf) {
-            timeFrame = "today";
-            reminderKey = "dayOf";
-          }
-
-          if (reminderKey) {
-            // Fetch User
-            const userSnap = await db.collection("users").doc(booking.userId).get();
-            if (!userSnap.exists) continue;
-            const userProfile = userSnap.data();
-
-            // Send Reminder
-            console.log(`[REMINDER] Sending ${reminderKey} reminder to ${userProfile.email} for ${event.title}`);
-            
-            await sendEmailHelper({
-              to: userProfile.email,
-              subject: `Reminder: ${event.title} is ${timeFrame}`,
-              body: `
-                <div style="font-family: serif; color: #171717; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #e5e5e5;">
-                  <h1 style="text-transform: uppercase; letter-spacing: 0.2em; text-align: center; font-size: 24px; margin-bottom: 40px;">Experience Reminder</h1>
-                  <p style="font-size: 18px; line-height: 1.6; margin-bottom: 24px;">Hello ${userProfile.firstName},</p>
-                  <p style="font-size: 16px; line-height: 1.6; color: #525252; margin-bottom: 24px;">
-                    This is a reminder that your experience <strong>${event.title}</strong> is ${timeFrame}.
-                  </p>
-                  <div style="background-color: #f9f9f9; padding: 24px; margin-bottom: 32px;">
-                    <p style="margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #737373;">Details</p>
-                    <p style="margin: 0 0 8px; font-size: 16px;"><strong>Date & Time:</strong> ${format(parseISO(event.dateTime), "MMMM d, yyyy 'at' h:mm a")}</p>
-                  </div>
-                  <p style="font-size: 16px; line-height: 1.6; color: #525252; margin-bottom: 40px;">
-                    We are excited to see you soon.
-                  </p>
-                </div>
-              `,
-              type: "reminder"
-            });
-            
-            // Update Booking
-            await bDoc.ref.update({
-              [`remindersSent.${reminderKey}`]: true
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error in reminder job:", error);
-      }
-    }, 1000 * 60 * 60); // Run every hour
-  };
-
-  startReminderJob();
 
   // Admin API: Set Admin Claim
   app.post("/api/set-admin", async (req, res) => {
