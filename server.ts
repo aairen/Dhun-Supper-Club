@@ -293,6 +293,80 @@ async function startServer() {
     res.json({ received: true });
   });
 
+  // API: Book Event
+  app.post("/api/book-event", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      const { eventId, numPeople } = req.body;
+
+      // 1. Get user and event
+      const userRef = db.collection("users").doc(decodedToken.uid);
+      const eventRef = db.collection("events").doc(eventId);
+      
+      await db.runTransaction(async (transaction: any) => {
+        const uSnap = await transaction.get(userRef);
+        const eSnap = await transaction.get(eventRef);
+        
+        if (!uSnap.exists) throw new Error("User not found");
+        if (!eSnap.exists) throw new Error("Event not found");
+        
+        const userData = uSnap.data();
+        const eventData = eSnap.data();
+        
+        // 2. Check credits
+        const totalCredits = eventData.creditsPerPerson * numPeople;
+        if (userData.credits < totalCredits) throw new Error("Insufficient credits");
+        
+        // 3. Check capacity
+        if ((eventData.bookedSeats || 0) + numPeople > eventData.capacity) throw new Error("Insufficient capacity");
+        
+        // 4. Create booking
+        const bookingRef = db.collection("bookings").doc();
+        transaction.set(bookingRef, {
+          userId: decodedToken.uid,
+          eventId,
+          numPeople,
+          totalCredits,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // 5. Update user credits
+        transaction.update(userRef, {
+          credits: userData.credits - totalCredits
+        });
+        
+        // 6. Update event seats
+        transaction.update(eventRef, {
+          bookedSeats: (eventData.bookedSeats || 0) + numPeople
+        });
+        
+        // 7. Log transaction
+        const transRef = db.collection("transactions").doc();
+        transaction.set(transRef, {
+          userId: decodedToken.uid,
+          amount: 0,
+          creditsIssued: -totalCredits,
+          type: "booking",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          bookingId: bookingRef.id,
+          eventId
+        });
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Booking error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -555,7 +629,51 @@ async function startServer() {
 
   startReminderJob();
 
-      // Admin API: Delete Event and Refund
+  // Admin API: Set Admin Claim
+  app.post("/api/set-admin", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      
+      // Verify requester is admin
+      let callerSnap;
+      try {
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        throw fsErr;
+      }
+      
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const { targetUserId } = req.body;
+      if (!targetUserId) {
+        return res.status(400).json({ error: "Target User ID is required" });
+      }
+
+      // Set custom claim
+      await adminApp!.auth().setCustomUserClaims(targetUserId, { admin: true });
+      
+      // Update role in Firestore
+      await db.collection("users").doc(targetUserId).update({ role: "admin" });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Admin set-admin error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin API: Delete Event and Refund
   app.post("/api/admin/delete-event", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

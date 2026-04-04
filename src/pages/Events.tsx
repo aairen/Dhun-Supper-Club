@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { DiningEvent, Booking } from "../types";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, isBefore } from "date-fns";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Calendar, Users, Star, ArrowRight, Filter, X, Info, Clock } from "lucide-react";
@@ -61,6 +61,8 @@ const Events = () => {
   };
 
   const filteredEvents = events.filter(event => {
+    if (isBefore(parseISO(event.dateTime), new Date())) return false;
+
     const status = getAvailabilityStatus(event);
     const isSoldOut = status === "Sold Out";
     

@@ -59,18 +59,25 @@ const AdminUsers = () => {
       if (!user) throw new Error("Not authenticated");
       
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/set-role", {
+      
+      // Use new admin endpoint
+      const response = await fetch("/api/set-admin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({ targetUid, role: newRole })
+        body: JSON.stringify({ targetUserId: targetUid })
       });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update role");
+      }
+      
+      // Force token refresh if the current user was promoted/demoted
+      if (user.uid === targetUid) {
+        await user.getIdToken(true);
       }
       
       // The UI will update automatically via onSnapshot

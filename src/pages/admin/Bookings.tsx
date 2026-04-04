@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, writeBatch } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { Booking, DiningEvent, UserProfile } from "../../types";
-import { format, parseISO } from "date-fns";
-import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser } from "lucide-react";
+import { format, parseISO, isBefore } from "date-fns";
+import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser, ChevronUp, ChevronDown } from "lucide-react";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { AlertModal } from "../../components/AlertModal";
 
@@ -132,7 +132,37 @@ const AdminBookings = () => {
     }
   };
 
-  const filteredBookings = bookings.filter(b => 
+  const [sortConfig, setSortConfig] = useState<{ key: "createdAt"; direction: "asc" | "desc" }>({ key: "createdAt", direction: "desc" });
+
+  const sortedBookings = useMemo(() => {
+    const sortableBookings = [...bookings];
+    sortableBookings.sort((a, b) => {
+      const aValue = new Date(a.createdAt).getTime();
+      const bValue = new Date(b.createdAt).getTime();
+      if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sortableBookings;
+  }, [bookings, sortConfig]);
+
+  const requestSort = (key: "createdAt") => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const activeBookings = sortedBookings.filter(b => b.event && !isBefore(parseISO(b.event.dateTime), new Date()));
+  const pastBookings = sortedBookings.filter(b => b.event && isBefore(parseISO(b.event.dateTime), new Date()));
+
+  const filteredActiveBookings = activeBookings.filter(b => 
+    b.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.eventTitle.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPastBookings = pastBookings.filter(b => 
     b.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.eventTitle.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -208,35 +238,60 @@ const AdminBookings = () => {
             <div className="p-6 text-center">
               <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
             </div>
-          ) : filteredBookings.length > 0 ? (
-            filteredBookings.map(booking => (
-              <div key={booking.id} className="p-4 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="font-medium text-neutral-900">{booking.userEmail}</div>
-                  <button 
-                    onClick={() => handleCancelBooking(booking.id)}
-                    disabled={cancellingId === booking.id}
-                    className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
-                  >
-                    {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-                  </button>
-                </div>
-                <div className="text-sm font-serif text-neutral-900">{booking.eventTitle}</div>
-                <div className="flex items-center text-xs text-neutral-500 gap-4">
-                  <div className="flex items-center">
-                    <Users className="w-3 h-3 mr-1" />
-                    {booking.numPeople}
-                  </div>
-                  <div className="flex items-center">
-                    <DollarSign className="w-3 h-3 mr-1" />
-                    {booking.totalCredits}
-                  </div>
-                  <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy")}</div>
-                </div>
-              </div>
-            ))
           ) : (
-            <div className="p-6 text-center text-neutral-400 italic">No bookings found.</div>
+            <>
+              {filteredActiveBookings.map(booking => (
+                <div key={booking.id} className="p-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="font-medium text-neutral-900">{booking.userEmail}</div>
+                    <button 
+                      onClick={() => handleCancelBooking(booking.id)}
+                      disabled={cancellingId === booking.id}
+                      className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                    >
+                      {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
+                    </button>
+                  </div>
+                  <div className="text-sm font-serif text-neutral-900">{booking.eventTitle}</div>
+                  <div className="flex items-center text-xs text-neutral-500 gap-4">
+                    <div className="flex items-center">
+                      <Users className="w-3 h-3 mr-1" />
+                      {booking.numPeople}
+                    </div>
+                    <div className="flex items-center">
+                      <DollarSign className="w-3 h-3 mr-1" />
+                      {booking.totalCredits}
+                    </div>
+                    <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}</div>
+                  </div>
+                </div>
+              ))}
+              {filteredActiveBookings.length === 0 && (
+                <div className="p-6 text-center text-neutral-400 italic">No active bookings found.</div>
+              )}
+              {filteredPastBookings.length > 0 && (
+                <>
+                  <div className="p-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Bookings</div>
+                  {filteredPastBookings.map(booking => (
+                    <div key={booking.id} className="p-4 space-y-2 opacity-60">
+                      <div className="font-medium text-neutral-900">{booking.userEmail}</div>
+                      <div className="text-sm font-serif text-neutral-900">{booking.eventTitle}</div>
+                      <div className="flex items-center text-xs text-neutral-500 gap-4">
+                        <div className="flex items-center">
+                          <Users className="w-3 h-3 mr-1" />
+                          {booking.numPeople}
+                        </div>
+                        <div className="flex items-center">
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          {booking.totalCredits}
+                        </div>
+                        <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -248,7 +303,15 @@ const AdminBookings = () => {
                 <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">User</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Event</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Details</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Booking Date</th>
+                <th 
+                  className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-900 transition-colors"
+                  onClick={() => requestSort("createdAt")}
+                >
+                  <div className="flex items-center">
+                    Booking Time
+                    {sortConfig.key === "createdAt" && (sortConfig.direction === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-bold uppercase tracking-widest text-[10px] text-neutral-400 text-right">Actions</th>
               </tr>
             </thead>
@@ -259,50 +322,92 @@ const AdminBookings = () => {
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-400" />
                   </td>
                 </tr>
-              ) : filteredBookings.map(booking => (
-                <tr key={booking.id} className="hover:bg-neutral-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <Mail className="w-3 h-3 mr-2 text-neutral-400" />
-                      <span className="text-neutral-900 font-medium">{booking.userEmail}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
-                      <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-neutral-500">
-                    <div className="flex items-center">
-                      <Users className="w-3 h-3 mr-2" />
-                      {booking.numPeople} {booking.numPeople === 1 ? "person" : "people"}
-                    </div>
-                    <div className="flex items-center mt-1">
-                      <DollarSign className="w-3 h-3 mr-2" />
-                      {booking.totalCredits} credits
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-neutral-500">
-                    {format(parseISO(booking.createdAt), "MMM dd, yyyy")}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => handleCancelBooking(booking.id)}
-                      disabled={cancellingId === booking.id}
-                      className="text-xs font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
-                    >
-                      {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!loading && filteredBookings.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
-                    No bookings found.
-                  </td>
-                </tr>
+              ) : (
+                <>
+                  {filteredActiveBookings.map(booking => (
+                    <tr key={booking.id} className="hover:bg-neutral-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <Mail className="w-3 h-3 mr-2 text-neutral-400" />
+                          <span className="text-neutral-900 font-medium">{booking.userEmail}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center cursor-pointer hover:text-neutral-600" onClick={() => {/* TODO: Show event details */}}>
+                          <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
+                          <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-neutral-500">
+                        <div className="flex items-center">
+                          <Users className="w-3 h-3 mr-2" />
+                          {booking.numPeople} {booking.numPeople === 1 ? "person" : "people"}
+                        </div>
+                        <div className="flex items-center mt-1">
+                          <DollarSign className="w-3 h-3 mr-2" />
+                          {booking.totalCredits} credits
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-neutral-500">
+                        {format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleCancelBooking(booking.id)}
+                          disabled={cancellingId === booking.id}
+                          className="text-xs font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                        >
+                          {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredActiveBookings.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-neutral-400 italic">
+                        No active bookings found.
+                      </td>
+                    </tr>
+                  )}
+                  {filteredPastBookings.length > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={5} className="px-6 py-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Bookings</td>
+                      </tr>
+                      {filteredPastBookings.map(booking => (
+                        <tr key={booking.id} className="hover:bg-neutral-50 transition-colors opacity-60">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <Mail className="w-3 h-3 mr-2 text-neutral-400" />
+                              <span className="text-neutral-900 font-medium">{booking.userEmail}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
+                              <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-neutral-500">
+                            <div className="flex items-center">
+                              <Users className="w-3 h-3 mr-2" />
+                              {booking.numPeople} {booking.numPeople === 1 ? "person" : "people"}
+                            </div>
+                            <div className="flex items-center mt-1">
+                              <DollarSign className="w-3 h-3 mr-2" />
+                              {booking.totalCredits} credits
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-neutral-500">
+                            {format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </tbody>
           </table>

@@ -34,12 +34,7 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && 
-             (
-               (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-               (request.auth.token.email == "airenarjun6@gmail.com" && request.auth.token.email_verified == true)
-             );
+      return isAuthenticated() && request.auth.token.admin == true;
     }
     
     function isValidUser(data) {
@@ -80,7 +75,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
       allow update: if isAuthenticated() && (
-        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])) || 
+        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role', 'credits'])) || 
         isAdmin()
       ) && isValidUser(request.resource.data);
       allow delete: if isOwner(userId) || isAdmin();

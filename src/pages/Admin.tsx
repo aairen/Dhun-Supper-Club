@@ -5,6 +5,7 @@ import AdminOverview from "./admin/Overview";
 import AdminEvents from "./admin/Events";
 import AdminBookings from "./admin/Bookings";
 import AdminUsers from "./admin/Users";
+import AdminMessages from "./admin/Messages";
 import AdminRevenue from "./admin/Revenue";
 
 const Admin = () => {
@@ -16,6 +17,7 @@ const Admin = () => {
         <Route path="/bookings" element={<AdminBookings />} />
         <Route path="/users" element={<AdminUsers />} />
         <Route path="/revenue" element={<AdminRevenue />} />
+        <Route path="/messages" element={<AdminMessages />} />
         {/* Fallback for legacy routes if any */}
         <Route path="/reservations" element={<Navigate to="/admin/bookings" replace />} />
         <Route path="/transactions" element={<Navigate to="/admin/revenue" replace />} />

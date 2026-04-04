@@ -6,6 +6,7 @@ import {
   Users, 
   Users2, 
   DollarSign, 
+  MessageSquare,
   ArrowLeft 
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -19,6 +20,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "Bookings", path: "/admin/bookings", icon: Users },
     { name: "Users", path: "/admin/users", icon: Users2 },
     { name: "Revenue", path: "/admin/revenue", icon: DollarSign },
+    { name: "Messages", path: "/admin/messages", icon: MessageSquare },
   ];
 
   return (

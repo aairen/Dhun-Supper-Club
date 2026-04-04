@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, addDoc, deleteDoc, doc, getDocs, writeBa
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../../firebase";
 import { DiningEvent } from "../../types";
-import { format, parseISO, addDays, startOfMonth } from "date-fns";
+import { format, parseISO, addDays, startOfMonth, isBefore } from "date-fns";
 import { Plus, Trash2, Calendar, Clock, Users, DollarSign, X, Image as ImageIcon, Upload, ChevronUp, ChevronDown, RefreshCw, Database, Eraser, Pencil } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AnimatePresence, motion } from "motion/react";
@@ -85,6 +85,9 @@ const AdminEvents = () => {
     });
     return sortableEvents;
   }, [events, sortConfig]);
+
+  const activeEvents = sortedEvents.filter(e => !isBefore(parseISO(e.dateTime), new Date()));
+  const pastEvents = sortedEvents.filter(e => isBefore(parseISO(e.dateTime), new Date()));
 
   const requestSort = (key: SortConfig["key"]) => {
     let direction: SortConfig["direction"] = "asc";
@@ -556,8 +559,8 @@ const AdminEvents = () => {
       <div className="bg-white border border-neutral-200 shadow-sm overflow-hidden">
         {/* Mobile Card Layout */}
         <div className="md:hidden divide-y divide-neutral-100">
-          {sortedEvents.length > 0 ? (
-            sortedEvents.map(event => (
+          {activeEvents.length > 0 ? (
+            activeEvents.map(event => (
               <div key={event.id} className="p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 flex-shrink-0 overflow-hidden">
@@ -569,7 +572,7 @@ const AdminEvents = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 cursor-pointer hover:text-neutral-600" onClick={() => handleEdit(event)}>
                     <div className="font-serif text-neutral-900 truncate">{event.title}</div>
                     <div className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</div>
                   </div>
@@ -607,7 +610,46 @@ const AdminEvents = () => {
               </div>
             ))
           ) : (
-            <div className="p-6 text-center text-neutral-400 italic">No events found.</div>
+            <div className="p-6 text-center text-neutral-400 italic">No active events found.</div>
+          )}
+          
+          {pastEvents.length > 0 && (
+            <>
+              <div className="p-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Events</div>
+              {pastEvents.map(event => (
+                <div key={event.id} className="p-4 space-y-3 opacity-60 grayscale">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 flex-shrink-0 overflow-hidden">
+                      {event.imageUrl ? (
+                        <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4 text-neutral-300" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-serif text-neutral-900 truncate">{event.title}</div>
+                      <div className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center text-xs text-neutral-500 gap-4">
+                    <div className="flex items-center">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                    </div>
+                    <div className="flex items-center">
+                      <Users className="w-3 h-3 mr-1" />
+                      {event.bookedSeats || 0} / {event.capacity}
+                    </div>
+                    <div className="flex items-center">
+                      <DollarSign className="w-3 h-3 mr-1" />
+                      {event.creditsPerPerson}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </div>
 
@@ -649,10 +691,10 @@ const AdminEvents = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {sortedEvents.map(event => (
+              {activeEvents.map(event => (
                 <tr key={event.id} className="hover:bg-neutral-50 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex items-center">
+                    <div className="flex items-center cursor-pointer hover:text-neutral-600" onClick={() => handleEdit(event)}>
                       <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
                         {event.imageUrl ? (
                           <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
@@ -710,6 +752,58 @@ const AdminEvents = () => {
                   </td>
                 </tr>
               ))}
+              {pastEvents.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Events</td>
+                  </tr>
+                  {pastEvents.map(event => (
+                    <tr key={event.id} className="hover:bg-neutral-50 transition-colors opacity-60 grayscale">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
+                            {event.imageUrl ? (
+                              <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon className="w-4 h-4 text-neutral-300" />
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-serif text-neutral-900 block">{event.title}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</span>
+                      </td>
+                      <td className="px-6 py-4 text-neutral-500">
+                        <div className="flex items-center">
+                          <Calendar className="w-3 h-3 mr-2" />
+                          {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                        </div>
+                        <div className="flex items-center mt-1">
+                          <Clock className="w-3 h-3 mr-2" />
+                          {format(parseISO(event.dateTime), "h:mm a")}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-neutral-500">
+                        <div className="flex items-center">
+                          <Users className="w-3 h-3 mr-2" />
+                          {event.bookedSeats || 0} / {event.capacity}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-neutral-500">
+                        <div className="flex items-center">
+                          <DollarSign className="w-3 h-3 mr-2" />
+                          {event.creditsPerPerson}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
               {events.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-neutral-400 italic">
