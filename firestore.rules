@@ -59,13 +59,36 @@ service cloud.firestore {
              (!('bookedSeats' in data) || data.bookedSeats is number) &&
              (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
-             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() < 100));
+             (!('createdAt' in data) || data.createdAt is timestamp ||
+               (data.createdAt is string && data.createdAt.size() < 100));
+    }
+
+    // Auto-generated event ids from eventUtils (client-side booking seeds event on first book)
+    function isAutoEventId(eventId) {
+      return eventId.matches('^curated-[0-9]{4}-[0-9]{2}-[0-9]{2}$') ||
+             eventId.matches('^hands-on-[0-9]{4}-[0-9]{2}-[0-9]{2}$') ||
+             eventId.matches('^thali-(11|14)-[0-9]{4}-[0-9]{2}-[0-9]{2}$') ||
+             eventId.matches('^brunch-(10|13)-[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
     function isValidBooking(data) {
       return data.keys().hasAll(['userId', 'eventId', 'numPeople', 'totalCredits', 'createdAt']) &&
              data.numPeople is number && data.totalCredits is number &&
-             (data.userId == request.auth.uid || isAdmin());
+             (data.userId == request.auth.uid || isAdmin()) &&
+             (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() < 100));
+    }
+
+    function isValidTransactionCreate(data) {
+      return data.keys().hasAll(['userId', 'amount', 'creditsIssued', 'type', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number &&
+             data.creditsIssued is number &&
+             data.type in ['booking', 'purchase', 'refund'] &&
+             (data.timestamp is timestamp) &&
+             (!('bookingId' in data) || data.bookingId is string) &&
+             (!('eventId' in data) || data.eventId is string) &&
+             (!('stripeSessionId' in data) || data.stripeSessionId is string) &&
+             (!('reason' in data) || (data.reason is string && data.reason.size() < 500));
     }
 
     // ===============================================================
@@ -79,19 +102,41 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
       );
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
-      allow update: if isAuthenticated() && (
-        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])
-          && request.resource.data.role in ['user', 'member']) ||
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
-      ) && isValidUser(request.resource.data);
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin") ||
+        (isOwner(userId) && (
+          (request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['firstName', 'lastName', 'notificationPrefs', 'role'])
+            && request.resource.data.role in ['user', 'member']) ||
+          (request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['credits', 'membershipProgress'])
+            && request.resource.data.credits is number && request.resource.data.credits >= 0
+            && request.resource.data.membershipProgress is number && request.resource.data.membershipProgress >= 0) ||
+          (request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['credits', 'membershipProgress', 'role'])
+            && request.resource.data.role in ['user', 'member']
+            && request.resource.data.credits is number && request.resource.data.credits >= 0
+            && request.resource.data.membershipProgress is number && request.resource.data.membershipProgress >= 0)
+        ))
+      );
       allow delete: if isOwner(userId) || isAdmin();
     }
     
     match /events/{eventId} {
       allow read: if true;
-      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
+      allow create: if isValidEvent(request.resource.data) && (
+        (isAdmin()) ||
+        (isAuthenticated()
+          && request.resource.data.bookedSeats == 0
+          && isAutoEventId(eventId))
+      );
+      allow update: if (isAdmin() && isValidEvent(request.resource.data)) ||
+        (isAuthenticated() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedSeats']) &&
+         request.resource.data.bookedSeats is int &&
+         request.resource.data.bookedSeats >= 0 &&
+         request.resource.data.bookedSeats <= resource.data.capacity);
       allow delete: if isAdmin();
     }
     
@@ -104,7 +149,10 @@ service cloud.firestore {
     
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && (
+        (isAdmin() && request.resource.data.userId is string) ||
+        isValidTransactionCreate(request.resource.data)
+      );
       allow update, delete: if isAdmin();
     }
     

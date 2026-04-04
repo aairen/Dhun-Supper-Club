@@ -6,6 +6,7 @@ import { format, parseISO, isBefore } from "date-fns";
 import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser, ChevronUp, ChevronDown } from "lucide-react";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { AlertModal } from "../../components/AlertModal";
+import { apiUrl } from "../../lib/apiBase";
 
 const AdminBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -104,7 +105,7 @@ const AdminBookings = () => {
       if (!user) throw new Error("Not authenticated");
       
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/cancel-booking", {
+      const response = await fetch(apiUrl("/api/admin/cancel-booking"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

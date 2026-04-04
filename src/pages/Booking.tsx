@@ -11,6 +11,7 @@ import { cn } from "../lib/utils";
 import { generateAutoEvents } from "../lib/eventUtils";
 import { Link } from "react-router-dom";
 import { sendEmail, emailTemplates } from "../lib/email";
+import { bookEventInFirestore } from "../lib/bookEventClient";
 
 const Booking = () => {
   const { eventId } = useParams();
@@ -89,26 +90,13 @@ const Booking = () => {
     setError("");
 
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch("/api/book-event", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          eventId: event.id,
-          numPeople,
-          existingBookingId: existingBooking?.id ?? null,
-          eventData: event
-        }),
+      await bookEventInFirestore({
+        uid: user.uid,
+        eventId: event.id,
+        numPeople,
+        existingBookingId: existingBooking?.id ?? null,
+        eventData: event,
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to process booking");
-      }
 
       // Send confirmation email if enabled
       if (profile.notificationPrefs?.confirmations !== false) {

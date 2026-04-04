@@ -133,9 +133,35 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock", {
   apiVersion: "2023-10-16" as any,
 });
 
+function corsMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const defaults = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ];
+  const raw = process.env.CORS_ORIGINS?.trim();
+  const fromEnv = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const allowed = [...new Set([...defaults, ...fromEnv])];
+
+  const origin = req.headers.origin as string | undefined;
+  if (origin && allowed.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cron-secret");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  app.use(corsMiddleware);
 
   // Stripe webhook must read the raw body for signature verification.
   // Register before express.json() so the JSON parser does not consume the body.
@@ -302,7 +328,7 @@ async function startServer() {
     }
   });
 
-  // API: Book Event
+  // API: Book Event (optional; the web app uses client Firestore — see src/lib/bookEventClient.ts)
   app.post("/api/book-event", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

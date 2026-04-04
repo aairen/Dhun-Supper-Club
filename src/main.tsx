@@ -23,9 +23,13 @@ if (!firebaseConfigured) {
             VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,<br/>
             VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID</code>
         </p>
-        <p style="margin:0;color:#737373;font-size:0.8125rem;">
+        <p style="margin:0 0 1rem;color:#737373;font-size:0.8125rem;">
           Optional: <code>VITE_FIREBASE_FIRESTORE_DATABASE_ID</code>, <code>VITE_STRIPE_PUBLIC_KEY</code>.
-          Then push to <code>main</code> to redeploy.
+        </p>
+        <p style="margin:0;color:#737373;font-size:0.8125rem;">
+          For reservations and checkout, deploy <code>server.ts</code> somewhere, add secret <code>VITE_API_BASE_URL</code>
+          (your API origin, no trailing slash), and on the API set <code>CORS_ORIGINS</code> to your GitHub Pages origin
+          (e.g. <code>https://YOUR_USERNAME.github.io</code>). Then push to <code>main</code> to redeploy.
         </p>
       </div>
     </div>`;

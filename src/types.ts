@@ -49,7 +49,7 @@ export interface Transaction {
   userId: string;
   amount: number;
   creditsIssued: number;
-  type: "purchase" | "booking" | "cancellation";
+  type: "purchase" | "booking" | "cancellation" | "refund";
   timestamp: string;
 }
 

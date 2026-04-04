@@ -4,6 +4,7 @@ import { db, auth } from "../../firebase";
 import { UserProfile } from "../../types";
 import { Search, X, Loader2, User, Mail, Shield, ShieldAlert, DollarSign, Calendar, MoreVertical, UserPlus, UserMinus } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { apiUrl } from "../../lib/apiBase";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { AlertModal } from "../../components/AlertModal";
 
@@ -61,7 +62,7 @@ const AdminUsers = () => {
       const idToken = await user.getIdToken();
       
       // Use new admin endpoint
-      const response = await fetch("/api/set-admin", {
+      const response = await fetch(apiUrl("/api/set-admin"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

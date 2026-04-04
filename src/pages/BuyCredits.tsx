@@ -4,6 +4,7 @@ import { useAuth } from "../components/AuthProvider";
 import { motion } from "motion/react";
 import { CreditCard, Plus, Minus, Info, CheckCircle, ArrowRight, Gift } from "lucide-react";
 import { cn } from "../lib/utils";
+import { apiUrl, readResponseJson } from "../lib/apiBase";
 import { AlertModal } from "../components/AlertModal";
 
 const BuyCredits = () => {
@@ -73,12 +74,12 @@ const BuyCredits = () => {
       if (eventId) payload.eventId = eventId;
       if (numPeople != null && numPeople !== "") payload.numPeople = Number(numPeople);
 
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch(apiUrl("/api/create-checkout-session"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await readResponseJson<{ error?: string; url?: string }>(response);
       if (!response.ok) {
         throw new Error(data.error || "Checkout failed");
       }
