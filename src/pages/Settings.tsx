@@ -56,6 +56,7 @@ const SettingsPage = () => {
   // Deletion State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +131,12 @@ const SettingsPage = () => {
     setError(null);
 
     try {
+      // Re-authenticate if necessary
+      if (deletePassword) {
+        const credential = EmailAuthProvider.credential(user.email!, deletePassword);
+        await reauthenticateWithCredential(user, credential);
+      }
+
       // 1. Delete all user bookings and update event capacity
       const bookingsRef = collection(db, "bookings");
       const q = query(bookingsRef, where("userId", "==", user.uid));
@@ -167,7 +174,7 @@ const SettingsPage = () => {
       window.location.href = "/";
     } catch (err: any) {
       if (err.code === "auth/requires-recent-login") {
-        setError("For security reasons, you must re-authenticate before deleting your account. Please log out and log back in, then try again.");
+        setError("For security reasons, please enter your password to re-authenticate.");
       } else {
         setError(err.message);
       }
@@ -416,6 +423,13 @@ const SettingsPage = () => {
                   onChange={(e) => setDeleteConfirmEmail(e.target.value)}
                   placeholder="Enter your email"
                 />
+                <input
+                  type="password"
+                  className="w-full px-4 py-2 border border-neutral-200 bg-transparent focus:border-red-600 outline-none transition-all text-sm"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Enter your password to re-authenticate"
+                />
               </div>
               <div className="flex gap-4">
                 <button 
@@ -426,12 +440,13 @@ const SettingsPage = () => {
                 </button>
                 <button 
                   onClick={handleDeleteAccount}
-                  disabled={deleteConfirmEmail !== user?.email || loading}
+                  disabled={deleteConfirmEmail !== user?.email || !deletePassword || loading}
                   className="flex-1 bg-red-600 text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all disabled:opacity-50"
                 >
                   {loading ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
+              {error && <p className="text-red-600 text-xs mt-4">{error}</p>}
             </motion.div>
           </div>
         )}
