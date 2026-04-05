@@ -101,7 +101,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="images/thali.jpeg" 
+                  src={`${import.meta.env.BASE_URL}images/thali.jpeg`}
                   alt="Grand Thali Experience" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -128,7 +128,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="images/brunch.jpeg" 
+                  src={`${import.meta.env.BASE_URL}images/brunch.jpeg`}
                   alt="Tiffins & Toast Brunch" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -155,7 +155,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="images/curated.jpeg" 
+                  src={`${import.meta.env.BASE_URL}images/curated.jpeg`}
                   alt="Curated Dining" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -182,7 +182,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1974" 
+                  src={`${import.meta.env.BASE_URL}images/hands_on.jpeg`}
                   alt="Hands-On Cooking" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"

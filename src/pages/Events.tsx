@@ -142,11 +142,11 @@ const Events = () => {
             const canEdit = daysUntilEvent >= 14;
             
             // Image mapping for event types
-            const eventImages: Record<string, string> = {
-              thali: "images/thali.jpeg",
-              brunch: "images/brunch.jpeg",
-              curated: "images/curated.jpeg",
-              "hands-on": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800"
+            const eventImages = {
+              thali: `${import.meta.env.BASE_URL}images/thali.jpeg`,
+              brunch: `${import.meta.env.BASE_URL}images/brunch.jpeg`,
+              curated: `${import.meta.env.BASE_URL}images/curated.jpeg`,
+              "hands-on": `${import.meta.env.BASE_URL}images/hands_on.jpeg`
             };
             
             return (
@@ -161,7 +161,10 @@ const Events = () => {
                   <img 
                     src={eventImages[event.type] || eventImages.curated}
                     alt={event.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    className={cn(
+                      "w-full h-full object-cover group-hover:scale-105 transition-transform duration-700",
+                      event.type === 'hands-on' && "object-[50%_75%]"
+                    )}
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">

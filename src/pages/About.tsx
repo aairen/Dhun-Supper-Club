@@ -29,10 +29,10 @@ const About = () => {
               At the heart of Dhun is founder Ruchi Airen, a passionate and imaginative home cook whose culinary journey spans over 35 years. Her philosophy is rooted in the belief that food should not only nourish but also inspire—encouraging us to rethink, reimagine, and reinvent the way we approach everyday cooking and dining.
             </p>
 
-            <div className="aspect-video bg-neutral-100 overflow-hidden my-12">
+            <div className="aspect-square bg-neutral-100 overflow-hidden my-12 max-w-md mx-auto">
               <img 
-                src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1000" 
-                alt="Culinary Craft" 
+                src={`${import.meta.env.BASE_URL}images/ruchi.jpeg`}
+                alt="Founder of Dhun, Ruchi Airen" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
