@@ -2,6 +2,10 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowRight, Star, Users, Calendar } from "lucide-react";
+import thaliImg from '../../images/thali.jpeg';
+import brunchImg from '../../images/brunch.jpeg';
+import curatedImg from '../../images/curated.jpeg';
+import hands_onImg from '../../images/hands_on.jpeg';
 
 const Home = () => {
   return (
@@ -101,7 +105,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/thali.jpeg`}
+                  src={thaliImg}
                   alt="Grand Thali Experience" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -128,7 +132,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/brunch.jpeg`}
+                  src={brunchImg}
                   alt="Tiffins & Toast Brunch" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -155,7 +159,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/curated.jpeg`}
+                  src={curatedImg}
                   alt="Curated Dining" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -182,7 +186,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/hands_on.jpeg`}
+                  src={hands_onImg}
                   alt="Hands-On Cooking" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"

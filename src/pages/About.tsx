@@ -1,5 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
+import ruchiImg from '../../images/ruchi.jpeg';
 
 const About = () => {
   return (
@@ -31,7 +32,7 @@ const About = () => {
 
             <div className="aspect-square bg-neutral-100 overflow-hidden my-12 max-w-md mx-auto">
               <img 
-                src={`${import.meta.env.BASE_URL}images/ruchi.jpeg`}
+                src={ruchiImg}
                 alt="Founder of Dhun, Ruchi Airen" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
