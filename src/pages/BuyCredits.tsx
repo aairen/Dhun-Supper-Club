@@ -98,13 +98,6 @@ const BuyCredits = () => {
       />
       <div className="max-w-4xl mx-auto px-4">
         
-        {isDemoMode && (
-          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 text-blue-800 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest">Demo Mode Active</p>
-            <p className="text-[10px] mt-1 opacity-80">Stripe is not configured. Payments will be simulated for testing purposes.</p>
-          </div>
-        )}
-
         <div className="text-center mb-12 md:mb-16">
           <h1 className="text-3xl md:text-4xl font-serif text-neutral-900 mb-4 uppercase tracking-widest">Credit Wallet</h1>
           <p className="text-sm md:text-base text-neutral-500 font-light">Purchase credits to book your next dining experience.</p>
