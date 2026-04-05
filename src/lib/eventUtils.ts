@@ -1,4 +1,4 @@
-import { eachDayOfInterval, isFriday, isSaturday, isSunday, format } from "date-fns";
+import { startOfMonth, endOfMonth, eachDayOfInterval, isFriday, isSaturday, isSunday, format, addDays, isAfter, isBefore, getWeekOfMonth, getDay, startOfWeek, endOfWeek } from "date-fns";
 import { DiningEvent } from "../types";
 
 export function generateAutoEvents(startDate?: Date, endDate?: Date): DiningEvent[] {

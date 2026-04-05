@@ -3,10 +3,10 @@ import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, writeBatc
 import { db, auth } from "../../firebase";
 import { Booking, DiningEvent, UserProfile } from "../../types";
 import { format, parseISO, isBefore } from "date-fns";
-import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, X, Loader2, Calendar, User, Mail, Users, DollarSign, Eraser, ChevronUp, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { AlertModal } from "../../components/AlertModal";
-import { apiUrl } from "../../lib/apiBase";
+import { Modal } from "../../components/Modal";
 
 const AdminBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -14,6 +14,13 @@ const AdminBookings = () => {
   const [clearing, setClearing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<DiningEvent | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [bookingToEdit, setBookingToEdit] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [newNumPeople, setNewNumPeople] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
@@ -39,7 +46,8 @@ const AdminBookings = () => {
         return {
           ...booking,
           userEmail: userSnap.exists() ? (userSnap.data() as UserProfile).email : "Unknown User",
-          eventTitle: eventSnap.exists() ? (eventSnap.data() as DiningEvent).title : "Unknown Event"
+          eventTitle: eventSnap.exists() ? (eventSnap.data() as DiningEvent).title : "Unknown Event",
+          event: eventSnap.exists() ? (eventSnap.data() as DiningEvent) : null
         };
       }));
       
@@ -58,24 +66,27 @@ const AdminBookings = () => {
     setShowClearModal(false);
     setClearing(true);
     try {
-      // 1. Delete all bookings
-      const bookingSnapshot = await getDocs(collection(db, "bookings"));
-      const batch = writeBatch(db);
-      bookingSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
       
-      // 2. Reset all event bookedSeats to 0
-      const eventSnapshot = await getDocs(collection(db, "events"));
-      eventSnapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, { bookedSeats: 0 });
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/clear-all-bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        }
       });
 
-      await batch.commit();
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to clear bookings");
+      }
+
       setAlertConfig({
         isOpen: true,
         title: "Success",
-        message: "All bookings cleared successfully.",
+        message: "All bookings cleared and refunded successfully.",
         variant: "success",
       });
     } catch (err: any) {
@@ -95,6 +106,53 @@ const AdminBookings = () => {
     setShowCancelModal(true);
   };
 
+  const handleEditBooking = (booking: any) => {
+    setBookingToEdit(booking);
+    setNewNumPeople(booking.numPeople);
+    setIsEditModalOpen(true);
+  };
+
+  const confirmEditBooking = async () => {
+    if (!bookingToEdit) return;
+    setIsEditing(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+      
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/edit-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ bookingId: bookingToEdit.id, numPeople: newNumPeople })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to edit booking");
+      }
+      
+      setIsEditModalOpen(false);
+      setAlertConfig({
+        isOpen: true,
+        title: "Success",
+        message: "Booking updated successfully.",
+        variant: "success",
+      });
+    } catch (err: any) {
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to edit booking",
+        variant: "error",
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
   const confirmCancelBooking = async () => {
     if (!bookingToCancel) return;
     const bookingId = bookingToCancel;
@@ -105,7 +163,7 @@ const AdminBookings = () => {
       if (!user) throw new Error("Not authenticated");
       
       const idToken = await user.getIdToken();
-      const response = await fetch(apiUrl("/api/admin/cancel-booking"), {
+      const response = await fetch("/api/admin/cancel-booking", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -138,8 +196,10 @@ const AdminBookings = () => {
   const sortedBookings = useMemo(() => {
     const sortableBookings = [...bookings];
     sortableBookings.sort((a, b) => {
-      const aValue = new Date(a.createdAt).getTime();
-      const bValue = new Date(b.createdAt).getTime();
+      const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      const aValue = aDate.getTime();
+      const bValue = bDate.getTime();
       if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
       if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
@@ -155,8 +215,33 @@ const AdminBookings = () => {
     setSortConfig({ key, direction });
   };
 
-  const activeBookings = sortedBookings.filter(b => b.event && !isBefore(parseISO(b.event.dateTime), new Date()));
-  const pastBookings = sortedBookings.filter(b => b.event && isBefore(parseISO(b.event.dateTime), new Date()));
+  const safeFormatDate = (date: any) => {
+    try {
+      const d = date?.toDate ? date.toDate() : parseISO(date);
+      return format(d, "MMM dd, yyyy h:mm a");
+    } catch (e) {
+      return "Invalid Date";
+    }
+  };
+
+  const isEventActive = (event: DiningEvent) => {
+    try {
+      return !isBefore(parseISO(event.dateTime), new Date());
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const isEventPast = (event: DiningEvent) => {
+    try {
+      return isBefore(parseISO(event.dateTime), new Date());
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const activeBookings = sortedBookings.filter(b => b.event && isEventActive(b.event));
+  const pastBookings = sortedBookings.filter(b => b.event && isEventPast(b.event));
 
   const filteredActiveBookings = activeBookings.filter(b => 
     b.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -190,6 +275,35 @@ const AdminBookings = () => {
         variant="danger"
         isLoading={!!cancellingId}
       />
+      <Modal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        title="Edit Booking"
+      >
+        {bookingToEdit && (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-900">Editing booking for {bookingToEdit.userEmail}</p>
+            <div className="flex items-center gap-4">
+              <label className="text-xs font-bold uppercase tracking-widest">Number of People:</label>
+              <input 
+                type="number"
+                min={1}
+                max={bookingToEdit.numPeople - 1}
+                value={newNumPeople}
+                onChange={(e) => setNewNumPeople(parseInt(e.target.value))}
+                className="w-20 p-2 border border-neutral-200"
+              />
+            </div>
+            <button 
+              onClick={confirmEditBooking}
+              disabled={isEditing}
+              className="w-full bg-neutral-900 text-white py-2 text-xs font-bold uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+            >
+              {isEditing ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        )}
+      </Modal>
       <AlertModal
         isOpen={alertConfig.isOpen}
         onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
@@ -245,13 +359,23 @@ const AdminBookings = () => {
                 <div key={booking.id} className="p-4 space-y-2">
                   <div className="flex justify-between items-start">
                     <div className="font-medium text-neutral-900">{booking.userEmail}</div>
-                    <button 
-                      onClick={() => handleCancelBooking(booking.id)}
-                      disabled={cancellingId === booking.id}
-                      className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
-                    >
-                      {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleEditBooking(booking)}
+                        className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"
+                        title="Edit Booking"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleCancelBooking(booking.id)}
+                        disabled={cancellingId === booking.id}
+                        className="text-neutral-400 hover:text-red-600 transition-colors p-2"
+                        title="Cancel Booking"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-sm font-serif text-neutral-900">{booking.eventTitle}</div>
                   <div className="flex items-center text-xs text-neutral-500 gap-4">
@@ -263,7 +387,7 @@ const AdminBookings = () => {
                       <DollarSign className="w-3 h-3 mr-1" />
                       {booking.totalCredits}
                     </div>
-                    <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}</div>
+                    <div>{safeFormatDate(booking.createdAt)}</div>
                   </div>
                 </div>
               ))}
@@ -286,7 +410,7 @@ const AdminBookings = () => {
                           <DollarSign className="w-3 h-3 mr-1" />
                           {booking.totalCredits}
                         </div>
-                        <div>{format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}</div>
+                        <div>{safeFormatDate(booking.createdAt)}</div>
                       </div>
                     </div>
                   ))}
@@ -334,7 +458,14 @@ const AdminBookings = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center cursor-pointer hover:text-neutral-600" onClick={() => {/* TODO: Show event details */}}>
+                        <div 
+                          className="flex items-center cursor-pointer hover:text-neutral-600" 
+                          onClick={() => {
+                            setSelectedEvent(booking.event);
+                            setSelectedBooking(booking);
+                            setIsEventModalOpen(true);
+                          }}
+                        >
                           <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
                           <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
                         </div>
@@ -350,16 +481,26 @@ const AdminBookings = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-neutral-500">
-                        {format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}
+                        {safeFormatDate(booking.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => handleCancelBooking(booking.id)}
-                          disabled={cancellingId === booking.id}
-                          className="text-xs font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
-                        >
-                          {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button 
+                            onClick={() => handleEditBooking(booking)}
+                            className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"
+                            title="Edit Booking"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleCancelBooking(booking.id)}
+                            disabled={cancellingId === booking.id}
+                            className="text-neutral-400 hover:text-red-600 transition-colors p-2"
+                            title="Cancel Booking"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -384,7 +525,14 @@ const AdminBookings = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex items-center">
+                            <div 
+                              className="flex items-center cursor-pointer hover:text-neutral-600" 
+                              onClick={() => {
+                                setSelectedEvent(booking.event);
+                                setSelectedBooking(booking);
+                                setIsEventModalOpen(true);
+                              }}
+                            >
                               <Calendar className="w-3 h-3 mr-2 text-neutral-400" />
                               <span className="text-neutral-900 font-serif">{booking.eventTitle}</span>
                             </div>
@@ -400,7 +548,7 @@ const AdminBookings = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-neutral-500">
-                            {format(parseISO(booking.createdAt), "MMM dd, yyyy HH:mm")}
+                            {safeFormatDate(booking.createdAt)}
                           </td>
                           <td className="px-6 py-4 text-right">
                           </td>
@@ -414,6 +562,21 @@ const AdminBookings = () => {
           </table>
         </div>
       </div>
+      <Modal 
+        isOpen={isEventModalOpen} 
+        onClose={() => setIsEventModalOpen(false)} 
+        title="Event Details"
+      >
+        {selectedEvent && selectedBooking && (
+          <div className="space-y-4">
+            <p><strong>Name:</strong> {selectedEvent.title}</p>
+            <p><strong>Date:</strong> {format(parseISO(selectedEvent.dateTime), "MMM dd, yyyy")}</p>
+            <p><strong>Time:</strong> {format(parseISO(selectedEvent.dateTime), "h:mm a")}</p>
+            <p><strong>Number of People:</strong> {selectedBooking.numPeople}</p>
+            <p><strong>Credits Spent:</strong> {selectedBooking.totalCredits}</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

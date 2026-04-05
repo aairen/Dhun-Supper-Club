@@ -9,8 +9,6 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_FIREBASE_FIRESTORE_DATABASE_ID: string;
   readonly VITE_STRIPE_PUBLIC_KEY: string;
-  /** Origin of the Express API when the UI is static (e.g. GitHub Pages), no trailing slash */
-  readonly VITE_API_BASE_URL?: string;
 }
 
 interface ImportMeta {

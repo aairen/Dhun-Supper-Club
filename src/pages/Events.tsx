@@ -143,9 +143,9 @@ const Events = () => {
             
             // Image mapping for event types
             const eventImages: Record<string, string> = {
-              thali: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&q=80&w=800",
-              brunch: "https://images.unsplash.com/photo-1513442542250-854d436a73f2?auto=format&fit=crop&q=80&w=800",
-              curated: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=800",
+              thali: "images/thali.jpeg",
+              brunch: "images/brunch.jpeg",
+              curated: "images/curated.jpeg",
               "hands-on": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800"
             };
             

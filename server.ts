@@ -7,9 +7,10 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { differenceInDays, parseISO, startOfDay, format } from "date-fns";
-import { Resend } from "resend";
 
 dotenv.config();
+//Fix for permission denied
+const serviceAccountKey = JSON.parse(process.env.FIREBASE_ADMIN_SDK_KEY || '{}');
 
 // Log environment variables for debugging (redacted for security where appropriate)
 console.log("[ENV CHECK] VITE_FIREBASE_PROJECT_ID:", process.env.VITE_FIREBASE_PROJECT_ID || "Not Set");
@@ -42,36 +43,15 @@ const isUserAdmin = (decodedToken: any, callerSnap: any) => {
   return isAdminRole;
 };
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-console.log(`[RESEND STATUS] ${resend ? "Initialized" : "Not Initialized (Missing API Key)"}`);
-
-async function sendEmailHelper({ to, subject, body, type }: { to: string; subject: string; body: string; type: string }) {
-  console.log(`[EMAIL ATTEMPT] To: ${to}, Subject: ${subject}, Type: ${type}`);
-  try {
-    if (resend) {
-      console.log(`[RESEND ATTEMPT] Sending via Resend...`);
-      const { data, error } = await resend.emails.send({
-        from: "Dhun Supper Club <onboarding@resend.dev>",
-        to: [to],
-        subject: subject,
-        html: body,
-      });
-
-      if (error) {
-        console.error("Resend error:", error);
-        return { success: false, error };
-      }
-
-      console.log(`[EMAIL SENT VIA RESEND] To: ${to}, Subject: ${subject}, ID: ${data?.id}`);
-      return { success: true, id: data?.id };
-    } else {
-      console.log(`[EMAIL SIMULATED] To: ${to}, Subject: ${subject}, Type: ${type}`);
-      return { success: true, message: "Simulated" };
-    }
-  } catch (err) {
-    console.error("Email helper error:", err);
-    return { success: false, error: err };
-  }
+async function createNotificationAdmin(userId: string, title: string, body: string) {
+  const db = await getDb();
+  await db.collection("notifications").add({
+    userId,
+    title,
+    body,
+    read: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 const getAppUrl = (req: express.Request) => {
@@ -89,17 +69,38 @@ let db: any = null;
 
 async function getDb() {
   if (!adminApp) {
-    const projectId = firebaseConfig.projectId;
-    
+    const projectId = firebaseConfig.projectId; // Assuming firebaseConfig has projectId
+    const serviceAccountKeyString = process.env.FIREBASE_ADMIN_SDK_KEY; // Get the secret string
+
     try {
-      if (projectId && !isPlaceholder(projectId)) {
-        console.log(`[FIREBASE ADMIN] Initializing with explicit projectId: ${projectId}`);
-        adminApp = admin.initializeApp({ projectId });
-      } else {
-        console.log(`[FIREBASE ADMIN] Initializing with default credentials (no valid projectId found)...`);
-        adminApp = admin.initializeApp();
+      if (serviceAccountKeyString && !isPlaceholder(serviceAccountKeyString)) {
+        // Attempt to initialize with explicit service account key from secret
+        const serviceAccountKey = JSON.parse(serviceAccountKeyString);
+        if (serviceAccountKey && serviceAccountKey.project_id === projectId) {
+          console.log(`[FIREBASE ADMIN] Initializing with explicit service account key from secret...`);
+          adminApp = admin.initializeApp({
+            credential: admin.credential.cert(serviceAccountKey),
+            // databaseURL is often not needed for Firestore-only usage
+          });
+        } else {
+          console.warn(`[FIREBASE ADMIN] WARNING: Service account key secret found, but project_id mismatch or invalid. Falling back.`);
+          // Fall through to the next initialization logic
+        }
       }
-      console.log(`[FIREBASE ADMIN] Initialized successfully. Project: ${adminApp.options.projectId || "Default"}`);
+
+      // If adminApp is still null (e.g., no valid serviceAccountKeyString or mismatch)
+      if (!adminApp) {
+        if (projectId && !isPlaceholder(projectId)) {
+          console.log(`[FIREBASE ADMIN] Initializing with explicit projectId: ${projectId}`);
+          adminApp = admin.initializeApp({ projectId });
+        } else {
+          console.log(`[FIREBASE ADMIN] Initializing with default credentials (no valid projectId found or key used)...`);
+          adminApp = admin.initializeApp();
+        }
+      }
+
+      console.log(`[FIREBASE ADMIN] Initialized successfully. Project: ${adminApp!.options.projectId || "Default"}`);
+
     } catch (err: any) {
       if (err.code === 'app/duplicate-app') {
         adminApp = admin.app();
@@ -112,7 +113,7 @@ async function getDb() {
   }
 
   if (!db) {
-    let dbId = firebaseConfig.firestoreDatabaseId;
+    let dbId = firebaseConfig.firestoreDatabaseId; // Assuming firebaseConfig has firestoreDatabaseId
     if (dbId === "(default)" || isPlaceholder(dbId)) {
       dbId = undefined;
     }
@@ -133,114 +134,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock", {
   apiVersion: "2023-10-16" as any,
 });
 
-function corsMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const defaults = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ];
-  const raw = process.env.CORS_ORIGINS?.trim();
-  const fromEnv = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  const allowed = [...new Set([...defaults, ...fromEnv])];
-
-  const origin = req.headers.origin as string | undefined;
-  if (origin && allowed.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-cron-secret");
-  res.setHeader("Access-Control-Max-Age", "86400");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-  next();
-}
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
-
-  app.use(corsMiddleware);
-
-  // Stripe webhook must read the raw body for signature verification.
-  // Register before express.json() so the JSON parser does not consume the body.
-  app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"] as string;
-    let event;
-
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.error("STRIPE_WEBHOOK_SECRET is not set");
-      return res.status(500).json({ error: "Webhook secret not configured" });
-    }
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        webhookSecret
-      );
-    } catch (err: any) {
-      console.error(`Webhook Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const { userId, credits, bonus } = session.metadata || {};
-
-      if (userId && credits) {
-        try {
-          const db = await getDb();
-          const userRef = db.collection("users").doc(userId);
-          const totalCredits = parseInt(credits) + (parseInt(bonus || "0"));
-
-          // Check if this session has already been processed to avoid double-crediting
-          const processedRef = db.collection("processed_sessions").doc(session.id);
-          const processedSnap = await processedRef.get();
-
-          if (!processedSnap.exists) {
-            await db.runTransaction(async (transaction: any) => {
-              const uSnap = await transaction.get(userRef);
-              if (!uSnap.exists) throw new Error("User not found");
-              
-              const currentCredits = uSnap.data().credits || 0;
-              transaction.update(userRef, {
-                credits: currentCredits + totalCredits
-              });
-
-              // Mark session as processed
-              transaction.set(processedRef, {
-                processedAt: admin.firestore.FieldValue.serverTimestamp(),
-                userId,
-                totalCredits
-              });
-
-              // Log transaction
-              const transRef = db.collection("transactions").doc();
-              transaction.set(transRef, {
-                userId,
-                amount: session.amount_total ? session.amount_total / 100 : 0,
-                creditsIssued: totalCredits,
-                type: "purchase",
-                timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                stripeSessionId: session.id
-              });
-            });
-
-            console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
-          } else {
-            console.log(`[STRIPE WEBHOOK] Session ${session.id} already processed`);
-          }
-        } catch (error) {
-          console.error("Error updating user credits from webhook:", error);
-        }
-      }
-    }
-
-    res.json({ received: true });
-  });
 
   // Middleware for JSON parsing
   app.use(express.json());
@@ -328,7 +224,85 @@ async function startServer() {
     }
   });
 
-  // API: Book Event (optional; the web app uses client Firestore — see src/lib/bookEventClient.ts)
+  // Stripe Webhook
+  app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"] as string;
+    let event;
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("STRIPE_WEBHOOK_SECRET is not set");
+      return res.status(500).json({ error: "Webhook secret not configured" });
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        webhookSecret
+      );
+    } catch (err: any) {
+      console.error(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const { userId, credits, bonus } = session.metadata || {};
+
+      if (userId && credits) {
+        try {
+          const db = await getDb();
+          const userRef = db.collection("users").doc(userId);
+          const totalCredits = parseInt(credits) + (parseInt(bonus || "0"));
+
+          // Check if this session has already been processed to avoid double-crediting
+          const processedRef = db.collection("processed_sessions").doc(session.id);
+          const processedSnap = await processedRef.get();
+
+          if (!processedSnap.exists) {
+            await db.runTransaction(async (transaction: any) => {
+              const uSnap = await transaction.get(userRef);
+              if (!uSnap.exists) throw new Error("User not found");
+              
+              const currentCredits = uSnap.data().credits || 0;
+              transaction.update(userRef, {
+                credits: currentCredits + totalCredits
+              });
+
+              // Mark session as processed
+              transaction.set(processedRef, {
+                processedAt: admin.firestore.FieldValue.serverTimestamp(),
+                userId,
+                totalCredits
+              });
+
+              // Log transaction
+              const transRef = db.collection("transactions").doc();
+              transaction.set(transRef, {
+                userId,
+                amount: session.amount_total ? session.amount_total / 100 : 0,
+                creditsIssued: totalCredits,
+                type: "purchase",
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                stripeSessionId: session.id
+              });
+            });
+
+            console.log(`[STRIPE WEBHOOK] Credits added to user ${userId}: ${totalCredits}`);
+          } else {
+            console.log(`[STRIPE WEBHOOK] Session ${session.id} already processed`);
+          }
+        } catch (error) {
+          console.error("Error updating user credits from webhook:", error);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  });
+
+  // API: Book Event
   app.post("/api/book-event", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -436,26 +410,7 @@ async function startServer() {
 
   // Send Email Route
   app.post("/api/send-email", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const idToken = authHeader.split("Bearer ")[1];
-    try {
-      await getDb();
-      await adminApp!.auth().verifyIdToken(idToken);
-    } catch (error) {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-
-    const { to, subject, body, type } = req.body;
-    const result = await sendEmailHelper({ to, subject, body, type });
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json(result);
-    }
+    return res.status(404).json({ error: "Email service disabled" });
   });
 
   // Reminder Cron Route
@@ -513,28 +468,6 @@ async function startServer() {
         if (shouldSend) {
           console.log(`[REMINDER SENT] To: ${user.email}, Event: ${event.title}, Timeframe: ${timeFrame}`);
           
-          await sendEmailHelper({
-            to: user.email,
-            subject: `Reminder: ${event.title} is ${timeFrame}`,
-            body: `
-              <div style="font-family: serif; color: #171717; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #e5e5e5;">
-                <h1 style="text-transform: uppercase; letter-spacing: 0.2em; text-align: center; font-size: 24px; margin-bottom: 40px;">Experience Reminder</h1>
-                <p style="font-size: 18px; line-height: 1.6; margin-bottom: 24px;">Hello ${user.firstName},</p>
-                <p style="font-size: 16px; line-height: 1.6; color: #525252; margin-bottom: 24px;">
-                  This is a reminder that your experience <strong>${event.title}</strong> is ${timeFrame}.
-                </p>
-                <div style="background-color: #f9f9f9; padding: 24px; margin-bottom: 32px;">
-                  <p style="margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #737373;">Details</p>
-                  <p style="margin: 0 0 8px; font-size: 16px;"><strong>Date & Time:</strong> ${format(parseISO(event.dateTime), "MMMM d, yyyy 'at' h:mm a")}</p>
-                </div>
-                <p style="font-size: 16px; line-height: 1.6; color: #525252; margin-bottom: 40px;">
-                  We are excited to see you soon.
-                </p>
-              </div>
-            `,
-            type: "reminder"
-          });
-
           // Update booking
           await db.collection("bookings").doc(bookingId).update({
             [`remindersSent.${reminderKey}`]: true
@@ -611,6 +544,114 @@ async function startServer() {
     }
   });
 
+
+  // Admin API: Clear ALL Bookings and Refund
+  app.post("/api/admin/clear-all-bookings", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      console.log(`[ADMIN API] clear-all-bookings attempt by ${decodedToken.email} (${decodedToken.uid})`);
+      
+      // Verify caller is admin
+      let callerSnap;
+      try {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.log(`[ADMIN API] Reading user ${decodedToken.uid} from project: ${projectId}`);
+        callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      } catch (fsErr: any) {
+        const projectId = adminApp!.options.projectId || "Unknown";
+        console.error(`[ADMIN API] Firestore read failed for caller ${decodedToken.uid} in project ${projectId}:`, fsErr);
+        throw fsErr;
+      }
+      
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const bookingsSnap = await db.collection("bookings").get();
+      const eventsSnap = await db.collection("events").get();
+      const eventsMap: Record<string, any> = {};
+      eventsSnap.docs.forEach(doc => eventsMap[doc.id] = doc.data());
+
+      // Group bookings by userId
+      const bookingsByUser: Record<string, any[]> = {};
+      bookingsSnap.docs.forEach(doc => {
+        const data = doc.data();
+        if (!bookingsByUser[data.userId]) bookingsByUser[data.userId] = [];
+        bookingsByUser[data.userId].push({ id: doc.id, ref: doc.ref, ...data });
+      });
+
+      let refundCount = 0;
+      // Process each user
+      for (const userId in bookingsByUser) {
+        const userBookings = bookingsByUser[userId];
+        const userRef = db.collection("users").doc(userId);
+        
+        await db.runTransaction(async (transaction: any) => {
+          const uSnap = await transaction.get(userRef);
+          if (!uSnap.exists) return;
+
+          let totalRefund = 0;
+          for (const booking of userBookings) {
+            totalRefund += booking.totalCredits;
+            transaction.delete(booking.ref);
+            
+            // Log refund transaction
+            const transRef = db.collection("transactions").doc();
+            transaction.set(transRef, {
+              userId: userId,
+              amount: 0,
+              creditsIssued: booking.totalCredits,
+              type: "refund",
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              bookingId: booking.id,
+              eventId: booking.eventId,
+              reason: "All bookings cleared by admin"
+            });
+
+            // Add notification
+            const event = eventsMap[booking.eventId];
+            const eventDate = event ? new Date(event.dateTime).toLocaleDateString() : "unknown date";
+            const eventTime = event ? new Date(event.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }) : "unknown time";
+
+            const eventTitle = event ? event.title : "unknown event";
+
+            const notifRef = db.collection("notifications").doc();
+            transaction.set(notifRef, {
+              userId: userId,
+              title: "Booking Canceled",
+              body: `Your reservation of <b>${eventTitle}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> for <b>${booking.numPeople} ${booking.numPeople === 1 ? "person" : "people"}</b> has been canceled by an <b><span style="color:red">admin</span></b>.`,
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          const currentCredits = uSnap.data().credits || 0;
+          transaction.update(userRef, {
+            credits: currentCredits + totalRefund
+          });
+        });
+        refundCount += userBookings.length;
+      }
+
+      const batch = db.batch();
+      eventsSnap.docs.forEach(doc => batch.update(doc.ref, { bookedSeats: 0 }));
+      await batch.commit();
+
+      res.json({ success: true, message: `All ${refundCount} bookings cleared and refunded` });
+    } catch (error: any) {
+      console.error("Admin clear-all-bookings error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Admin API: Set Admin Claim
   app.post("/api/set-admin", async (req, res) => {
@@ -712,6 +753,16 @@ async function startServer() {
             const currentCredits = uSnap.data().credits || 0;
             transaction.update(userRef, {
               credits: currentCredits + bookingData.totalCredits
+            });
+
+            // Add notification
+            const notifRef = db.collection("notifications").doc();
+            transaction.set(notifRef, {
+              userId: bookingData.userId,
+              title: "Event Cancelled",
+              body: `Your reservation for ${eventSnap.data()?.title} has been cancelled as the event was deleted by an admin.`,
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
             // Log refund transaction
@@ -927,8 +978,10 @@ async function startServer() {
         
         // 2. Refund credits
         const currentCredits = uSnap.data().credits || 0;
+        const currentProgress = uSnap.data().membershipProgress || 0;
         transaction.update(userRef, {
-          credits: currentCredits + bookingData.totalCredits
+          credits: currentCredits + bookingData.totalCredits,
+          membershipProgress: Math.max(0, currentProgress - bookingData.totalCredits)
         });
 
         // 3. Update event booked seats
@@ -950,11 +1003,90 @@ async function startServer() {
           bookingId: bookingId,
           eventId: bookingData.eventId
         });
+
+        // 5. Notify user
+        const eventData = eSnap.data();
+        const eventDate = eventData ? new Date(eventData.dateTime).toLocaleDateString() : "unknown date";
+        const eventTime = eventData ? new Date(eventData.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }) : "unknown time";
+        
+        const notifRef = db.collection("notifications").doc();
+        transaction.set(notifRef, {
+          userId: bookingData.userId,
+          title: "Booking Canceled",
+          body: `Your reservation of <b>${eventData?.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> for <b>${bookingData.numPeople} ${bookingData.numPeople === 1 ? "person" : "people"}</b> has been canceled by an <b><span style="color:red">admin</span></b>.`,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       });
 
       res.json({ success: true, message: "Booking cancelled and credits refunded" });
     } catch (error: any) {
       console.error("Admin cancel-booking error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/edit-booking", async (req, res) => {
+    try {
+      const db = await getDb();
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const idToken = authHeader.split("Bearer ")[1];
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const userDoc = await db.collection("users").doc(decodedToken.uid).get();
+      if (userDoc.data()?.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { bookingId, numPeople } = req.body;
+      const bookingRef = db.collection("bookings").doc(bookingId);
+      const bookingDoc = await bookingRef.get();
+      
+      if (!bookingDoc.exists) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
+
+      const booking = bookingDoc.data()!;
+      if (numPeople >= booking.numPeople) {
+        return res.status(400).json({ error: "Admins can only lower the number of guests" });
+      }
+
+      const eventRef = db.collection("events").doc(booking.eventId);
+      const eventDoc = await eventRef.get();
+      
+      if (!eventDoc.exists) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const event = eventDoc.data()!;
+      const seatsChange = numPeople - booking.numPeople;
+      
+      const batch = db.batch();
+      batch.update(eventRef, { bookedSeats: (event.bookedSeats || 0) + seatsChange });
+      batch.update(bookingRef, { numPeople, totalCredits: event.creditsPerPerson * numPeople });
+      
+      // Return credits
+      const creditDifference = (booking.numPeople - numPeople) * event.creditsPerPerson;
+      const userRef = db.collection("users").doc(booking.userId);
+      batch.update(userRef, { credits: admin.firestore.FieldValue.increment(creditDifference) });
+
+      await batch.commit();
+      
+      // Notify user
+      const eventDate = new Date(event.dateTime).toLocaleDateString();
+      const eventTime = new Date(event.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      await db.collection("notifications").add({
+        userId: booking.userId,
+        title: "Booking Updated",
+        body: `Your reservation of <b>${event.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> has updated to <b>${numPeople} ${numPeople === 1 ? "person" : "people"}</b> by an <b><span style="color:red">admin</span></b>.`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

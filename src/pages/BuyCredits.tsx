@@ -3,9 +3,11 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { motion } from "motion/react";
 import { CreditCard, Plus, Minus, Info, CheckCircle, ArrowRight, Gift } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
 import { cn } from "../lib/utils";
-import { apiUrl, readResponseJson } from "../lib/apiBase";
 import { AlertModal } from "../components/AlertModal";
+
+const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLIC_KEY || "pk_test_mock");
 
 const BuyCredits = () => {
   const [searchParams] = useSearchParams();
@@ -51,50 +53,34 @@ const BuyCredits = () => {
       navigate("/auth");
       return;
     }
-
-    const creditAmount = Number(credits);
-    if (!Number.isFinite(creditAmount) || creditAmount < 1) {
-      setAlertConfig({
-        isOpen: true,
-        title: "Invalid amount",
-        message: "Please enter a valid number of credits (at least 1).",
-        variant: "error",
-      });
-      return;
-    }
-
+    
     setLoading(true);
     try {
-      const payload: Record<string, unknown> = {
-        userId: user.uid,
-        credits: creditAmount,
-        bonus: bonusCredits,
-        totalAmount: total,
-      };
-      if (eventId) payload.eventId = eventId;
-      if (numPeople != null && numPeople !== "") payload.numPeople = Number(numPeople);
-
-      const response = await fetch(apiUrl("/api/create-checkout-session"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const { doc, updateDoc, increment } = await import("firebase/firestore");
+      const { db } = await import("../firebase");
+      
+      const userRef = doc(db, "users", user.uid);
+      const totalCreditsToAdd = Number(credits) + bonusCredits;
+      
+      await updateDoc(userRef, {
+        credits: increment(totalCreditsToAdd)
       });
-      const data = await readResponseJson<{ error?: string; url?: string }>(response);
-      if (!response.ok) {
-        throw new Error(data.error || "Checkout failed");
+
+      // If we came from a booking page, go back there
+      if (eventId) {
+        navigate(`/booking/${eventId}?numPeople=${numPeople}&success=true`);
+      } else {
+        navigate("/dashboard");
       }
-      if (!data.url) {
-        throw new Error("No checkout URL returned");
-      }
-      window.location.assign(data.url as string);
     } catch (error: any) {
       console.error("Purchase error:", error);
       setAlertConfig({
         isOpen: true,
         title: "Error",
-        message: error?.message || "Failed to start checkout. Please try again.",
+        message: "Failed to add credits. Please try again.",
         variant: "error",
       });
+    } finally {
       setLoading(false);
     }
   };

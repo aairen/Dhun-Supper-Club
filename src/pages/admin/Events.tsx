@@ -10,7 +10,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { generateAutoEvents } from "../../lib/eventUtils";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { AlertModal } from "../../components/AlertModal";
-import { apiUrl } from "../../lib/apiBase";
 
 type SortConfig = {
   key: "dateTime" | "capacity" | "type";
@@ -115,7 +114,7 @@ const AdminEvents = () => {
       if (!user) throw new Error("Not authenticated");
       
       const idToken = await user.getIdToken();
-      const response = await fetch(apiUrl("/api/admin/delete-all-events"), {
+      const response = await fetch("/api/admin/delete-all-events", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -299,7 +298,7 @@ const AdminEvents = () => {
       if (!user) throw new Error("Not authenticated");
       
       const idToken = await user.getIdToken();
-      const response = await fetch(apiUrl("/api/admin/delete-event"), {
+      const response = await fetch("/api/admin/delete-event", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -598,6 +597,10 @@ const AdminEvents = () => {
                   <div className="flex items-center">
                     <Calendar className="w-3 h-3 mr-1" />
                     {format(parseISO(event.dateTime), "MMM dd, yyyy")}
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {format(parseISO(event.dateTime), "h:mm a")}
                   </div>
                   <div className="flex items-center">
                     <Users className="w-3 h-3 mr-1" />

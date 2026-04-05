@@ -91,11 +91,11 @@ const Booking = () => {
 
     try {
       await bookEventInFirestore({
-        uid: user.uid,
         eventId: event.id,
         numPeople,
         existingBookingId: existingBooking?.id ?? null,
         eventData: event,
+        userData: profile
       });
 
       // Send confirmation email if enabled

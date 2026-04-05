@@ -86,6 +86,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["subject", "body", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -94,6 +108,7 @@
     "/bookings/{bookingId}": { "schema": "Booking", "description": "Event reservations." },
     "/transactions/{transactionId}": { "schema": "Transaction", "description": "Credit transactions." },
     "/blogPosts/{postId}": { "schema": "BlogPost", "description": "Blog articles." },
-    "/messages/{messageId}": { "schema": "Message", "description": "Contact messages." }
+    "/messages/{messageId}": { "schema": "Message", "description": "Contact messages." },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications." }
   }
 }

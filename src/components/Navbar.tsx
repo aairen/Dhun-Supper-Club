@@ -6,6 +6,7 @@ import { signOut } from "firebase/auth";
 import { Menu, X, User, LogOut, LayoutDashboard, Settings, CreditCard } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const { user, profile, isAdmin } = useAuth();
@@ -63,15 +64,18 @@ const Navbar = () => {
             ))}
 
             {user && (
-              <Link
-                to="/buy-credits"
-                className="flex items-center space-x-2 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 transition-colors rounded-full"
-              >
-                <CreditCard className="w-4 h-4 text-neutral-900" />
-                <span className="text-sm font-bold text-neutral-900">
-                  {profile?.credits || 0} Credits
-                </span>
-              </Link>
+              <>
+                <NotificationBell />
+                <Link
+                  to="/buy-credits"
+                  className="flex items-center space-x-2 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 transition-colors rounded-full"
+                >
+                  <CreditCard className="w-4 h-4 text-neutral-900" />
+                  <span className="text-sm font-bold text-neutral-900">
+                    {profile?.credits || 0} Credits
+                  </span>
+                </Link>
+              </>
             )}
 
             {user ? (
@@ -147,8 +151,9 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          {/* Mobile menu button and NotificationBell */}
+          <div className="md:hidden flex items-center space-x-4">
+            {user && <NotificationBell />}
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-neutral-900 hover:text-neutral-600 focus:outline-none"

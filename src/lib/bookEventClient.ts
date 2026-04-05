@@ -1,41 +1,36 @@
-import {
-  runTransaction,
-  doc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "../firebase";
-import type { DiningEvent } from "../types";
+import { doc, runTransaction, serverTimestamp, collection, increment } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { createNotification, formatPeople } from "./notificationUtils";
+import { format, parseISO } from "date-fns";
 
-export type BookEventInput = {
-  uid: string;
+export async function bookEventInFirestore({
+  eventId,
+  numPeople,
+  existingBookingId,
+  eventData,
+  userData
+}: {
   eventId: string;
   numPeople: number;
-  existingBookingId: string | null;
-  eventData: DiningEvent;
-};
+  existingBookingId?: string | null;
+  eventData: any;
+  userData: any;
+}) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error("Unauthorized");
 
-/**
- * Books or updates a reservation entirely in Firestore (no Express).
- * Mirrors server /api/book-event logic; deploy updated firestore.rules with the repo.
- */
-export async function bookEventInFirestore(input: BookEventInput): Promise<void> {
-  const { uid, eventId, numPeople, existingBookingId, eventData } = input;
-  const userRef = doc(db, "users", uid);
+  const userRef = doc(db, "users", userId);
   const eventRef = doc(db, "events", eventId);
 
   await runTransaction(db, async (transaction) => {
     const uSnap = await transaction.get(userRef);
-    let eSnap = await transaction.get(eventRef);
+    const eSnap = await transaction.get(eventRef);
 
     if (!uSnap.exists()) throw new Error("User not found");
 
-    let eventDataToUse: Record<string, unknown> | null = eSnap.exists()
-      ? (eSnap.data() as Record<string, unknown>)
-      : null;
-
-    if (!eSnap.exists()) {
-      const { id: _omit, ...eventFields } = eventData;
+    let eventDataToUse = eSnap.exists() ? eSnap.data() : null;
+    if (!eSnap.exists() && eventData) {
+      const { id, ...eventFields } = eventData;
       transaction.set(eventRef, {
         ...eventFields,
         bookedSeats: 0,
@@ -53,63 +48,47 @@ export async function bookEventInFirestore(input: BookEventInput): Promise<void>
       const existingBookingRef = doc(db, "bookings", existingBookingId);
       const existingSnap = await transaction.get(existingBookingRef);
       if (existingSnap.exists()) {
-        const ed = existingSnap.data();
-        if (ed.userId !== uid) throw new Error("Invalid booking");
-        previousCredits = ed.totalCredits as number;
-        previousNumPeople = ed.numPeople as number;
+        const data = existingSnap.data();
+        previousCredits = data.totalCredits;
+        previousNumPeople = data.numPeople;
         transaction.delete(existingBookingRef);
       }
     }
 
-    const cPer =
-      typeof eventDataToUse.creditsPerPerson === "number"
-        ? eventDataToUse.creditsPerPerson
-        : 0;
-    const cap =
-      typeof eventDataToUse.capacity === "number" ? eventDataToUse.capacity : 0;
-    const booked =
-      typeof eventDataToUse.bookedSeats === "number" ? eventDataToUse.bookedSeats : 0;
-
-    const totalCredits = cPer * numPeople;
+    const totalCredits = eventDataToUse.creditsPerPerson * numPeople;
     const creditDifference = totalCredits - previousCredits;
-    const uData = uSnap.data();
-    const currentCredits = typeof uData.credits === "number" ? uData.credits : 0;
-
-    if (currentCredits < creditDifference) throw new Error("Insufficient credits");
+    if (userData.credits < creditDifference) throw new Error("Insufficient credits");
 
     const seatsChange = numPeople - previousNumPeople;
-    if (booked + seatsChange > cap) throw new Error("Insufficient capacity");
+    if ((eventDataToUse.bookedSeats || 0) + seatsChange > eventDataToUse.capacity) throw new Error("Insufficient capacity");
 
     const bookingRef = doc(collection(db, "bookings"));
     transaction.set(bookingRef, {
-      userId: uid,
+      userId: userId,
       eventId,
       numPeople,
       totalCredits,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp()
     });
 
-    const prevProgress =
-      typeof uData.membershipProgress === "number" ? uData.membershipProgress : 0;
-
     transaction.update(userRef, {
-      credits: currentCredits - creditDifference,
-      membershipProgress: prevProgress + creditDifference,
+      credits: userData.credits - creditDifference,
+      membershipProgress: increment(creditDifference > 0 ? creditDifference : 0)
     });
 
     transaction.update(eventRef, {
-      bookedSeats: booked + seatsChange,
+      bookedSeats: (eventDataToUse.bookedSeats || 0) + seatsChange
     });
 
     const transRef = doc(collection(db, "transactions"));
     transaction.set(transRef, {
-      userId: uid,
+      userId: userId,
       amount: 0,
       creditsIssued: -creditDifference,
       type: "booking",
       timestamp: serverTimestamp(),
       bookingId: bookingRef.id,
-      eventId,
+      eventId
     });
   });
 }

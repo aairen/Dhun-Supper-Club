@@ -9,8 +9,8 @@ import { Calendar, CreditCard, Star, Clock, AlertCircle, XCircle, ChevronRight, 
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { generateAutoEvents } from "../lib/eventUtils";
+import { createNotification, formatPeople } from "../lib/notificationUtils";
 import { AlertModal } from "../components/AlertModal";
-import { apiUrl, readResponseJson } from "../lib/apiBase";
 
 const Dashboard = () => {
   const { profile, user } = useAuth();
@@ -41,13 +41,8 @@ const Dashboard = () => {
       const verifySession = async () => {
         setVerifyingPayment(true);
         try {
-          const response = await fetch(
-            apiUrl(`/api/verify-checkout-session?sessionId=${encodeURIComponent(sessionId)}`),
-          );
-          const data = await readResponseJson<{
-            success?: boolean;
-            creditsAdded?: number;
-          }>(response);
+          const response = await fetch(`/api/verify-checkout-session?sessionId=${sessionId}`);
+          const data = await response.json();
           if (data.success) {
             if (data.creditsAdded) {
               setPaymentSuccess(data.creditsAdded);

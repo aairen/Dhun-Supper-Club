@@ -101,7 +101,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&q=80&w=1974" 
+                  src="images/thali.jpeg" 
                   alt="Grand Thali Experience" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -128,7 +128,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="https://images.unsplash.com/photo-1513442542250-854d436a73f2?auto=format&fit=crop&q=80&w=1974" 
+                  src="images/brunch.jpeg" 
                   alt="Tiffins & Toast Brunch" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -155,7 +155,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src="https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=1974" 
+                  src="images/curated.jpeg" 
                   alt="Curated Dining" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"

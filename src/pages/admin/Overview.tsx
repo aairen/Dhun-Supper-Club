@@ -118,7 +118,7 @@ const AdminOverview = () => {
                   </div>
                 </div>
                 <span className="text-[10px] text-neutral-400 uppercase tracking-widest">
-                  {new Date(booking.createdAt).toLocaleDateString()}
+                  {booking.createdAt?.toDate ? booking.createdAt.toDate().toLocaleDateString() : new Date(booking.createdAt).toLocaleDateString()}
                 </span>
               </div>
             )) : (
