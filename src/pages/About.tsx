@@ -5,12 +5,12 @@ const About = () => {
   return (
     <div className="bg-white min-h-screen">
       {/* Header */}
-      <section className="py-24 bg-neutral-50 border-b border-neutral-100">
+      <section className="py-16 bg-neutral-50 border-b border-neutral-100">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-serif text-neutral-900 mb-6"
+            className="text-4xl md:text-5xl font-serif text-neutral-900"
           >
             About Dhun Supper Club
           </motion.h1>
@@ -18,7 +18,7 @@ const About = () => {
       </section>
 
       {/* Content */}
-      <section className="py-24">
+      <section className="py-12">
         <div className="max-w-3xl mx-auto px-4 space-y-12">
           <div className="space-y-8 text-neutral-600 font-light leading-relaxed text-lg">
             <p>
