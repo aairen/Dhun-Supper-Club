@@ -8,10 +8,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { Calendar, Users, Star, ArrowRight, Filter, X, Info, Clock } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../components/AuthProvider";
-import thaliImg from '../../images/thali.jpeg';
-import brunchImg from '../../images/brunch.jpeg';
-import curatedImg from '../../images/curated.jpeg';
-import hands_onImg from '../../images/hands_on.jpeg';
 
 const Events = () => {
   const { user, isMember } = useAuth();
@@ -147,10 +143,10 @@ const Events = () => {
             
             // Image mapping for event types
             const eventImages = {
-              thali: thaliImg,
-              brunch: brunchImg,
-              curated: curatedImg,
-              "hands-on": hands_onImg
+              thali: `${import.meta.env.BASE_URL}images/thali.jpeg`,
+              brunch: `${import.meta.env.BASE_URL}images/brunch.jpeg`,
+              curated: `${import.meta.env.BASE_URL}images/curated.jpeg`,
+              "hands-on": `${import.meta.env.BASE_URL}images/hands_on.jpeg`
             };
             
             return (
