@@ -29,6 +29,7 @@ const AdminEvents = () => {
   const [showClearModal, setShowClearModal] = useState(false);
   const [showPopulateModal, setShowPopulateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteAllPastModal, setShowDeleteAllPastModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
   const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; title: string; message: string; variant: "error" | "info" | "success" }>({
     isOpen: false,
@@ -49,6 +50,16 @@ const AdminEvents = () => {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const getEventImage = (event: DiningEvent) => {
+    const eventImages = {
+      thali: `${import.meta.env.BASE_URL}images/thali.jpeg`,
+      brunch: `${import.meta.env.BASE_URL}images/brunch.jpeg`,
+      curated: `${import.meta.env.BASE_URL}images/curated.jpeg`,
+      "hands-on": `${import.meta.env.BASE_URL}images/hands_on.jpeg`
+    };
+    return (event.imageUrl && event.imageUrl !== "") ? event.imageUrl : (eventImages[event.type] || eventImages.curated);
+  };
 
   useEffect(() => {
     const q = query(collection(db, "events"));
@@ -100,6 +111,49 @@ const AdminEvents = () => {
   const SortIcon = ({ column }: { column: SortConfig["key"] }) => {
     if (sortConfig.key !== column) return null;
     return sortConfig.direction === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />;
+  };
+
+  const handleDeleteAllPastEvents = async () => {
+    setShowDeleteAllPastModal(true);
+  };
+
+  const confirmDeleteAllPastEvents = async () => {
+    setShowDeleteAllPastModal(false);
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+      
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/delete-all-past-events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete past events");
+      }
+
+      setAlertConfig({
+        isOpen: true,
+        title: "Success",
+        message: "All past events deleted successfully.",
+        variant: "success",
+      });
+    } catch (err: any) {
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to delete past events",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearAll = async () => {
@@ -280,7 +334,7 @@ const AdminEvents = () => {
       creditsPerPerson: event.creditsPerPerson,
       imageUrl: event.imageUrl || "",
     });
-    setImagePreview(event.imageUrl || null);
+    setImagePreview(getEventImage(event));
     setShowAdd(true);
   };
 
@@ -360,6 +414,16 @@ const AdminEvents = () => {
         title="Delete Event"
         message="Are you sure you want to delete this event? All associated bookings will be refunded. This action cannot be undone."
         confirmText="Delete"
+        variant="danger"
+        isLoading={loading}
+      />
+      <ConfirmationModal
+        isOpen={showDeleteAllPastModal}
+        onClose={() => setShowDeleteAllPastModal(false)}
+        onConfirm={confirmDeleteAllPastEvents}
+        title="Delete All Past Events"
+        message="Are you sure you want to delete ALL past events? This cannot be undone."
+        confirmText="Delete All"
         variant="danger"
         isLoading={loading}
       />
@@ -564,13 +628,7 @@ const AdminEvents = () => {
               <div key={event.id} className="p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 flex-shrink-0 overflow-hidden">
-                    {event.imageUrl ? (
-                      <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="w-4 h-4 text-neutral-300" />
-                      </div>
-                    )}
+                    <img src={getEventImage(event)} alt={event.title} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0 cursor-pointer hover:text-neutral-600" onClick={() => handleEdit(event)}>
                     <div className="font-serif text-neutral-900 truncate">{event.title}</div>
@@ -619,7 +677,10 @@ const AdminEvents = () => {
           
           {pastEvents.length > 0 && (
             <>
-              <div className="p-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Events</div>
+              <div className="p-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400 flex justify-between items-center">
+                <span>Past Events</span>
+                <button onClick={handleDeleteAllPastEvents} className="text-red-600 hover:text-red-800">Delete All</button>
+              </div>
               {pastEvents.map(event => (
                 <div key={event.id} className="p-4 space-y-3 opacity-60 grayscale">
                   <div className="flex items-center gap-3">
@@ -635,6 +696,15 @@ const AdminEvents = () => {
                     <div className="flex-1 min-w-0">
                       <div className="font-serif text-neutral-900 truncate">{event.title}</div>
                       <div className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleDelete(event.id)}
+                        className="text-neutral-400 hover:text-red-600 transition-colors p-2"
+                        title="Delete Event"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                   <div className="flex items-center text-xs text-neutral-500 gap-4">
@@ -700,13 +770,7 @@ const AdminEvents = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center cursor-pointer hover:text-neutral-600" onClick={() => handleEdit(event)}>
                       <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
-                        {event.imageUrl ? (
-                          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="w-4 h-4 text-neutral-300" />
-                          </div>
-                        )}
+                        <img src={getEventImage(event)} alt={event.title} className="w-full h-full object-cover" />
                       </div>
                       <span className="font-serif text-neutral-900 block">{event.title}</span>
                     </div>
@@ -759,20 +823,19 @@ const AdminEvents = () => {
               {pastEvents.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">Past Events</td>
+                    <td colSpan={6} className="px-6 py-4 bg-neutral-50 font-bold uppercase tracking-widest text-[10px] text-neutral-400">
+                      <div className="flex justify-between items-center">
+                        <span>Past Events</span>
+                        <button onClick={handleDeleteAllPastEvents} className="text-red-600 hover:text-red-800">Delete All Past Events</button>
+                      </div>
+                    </td>
                   </tr>
                   {pastEvents.map(event => (
                     <tr key={event.id} className="hover:bg-neutral-50 transition-colors opacity-60 grayscale">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 mr-4 flex-shrink-0 overflow-hidden">
-                            {event.imageUrl ? (
-                              <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="w-4 h-4 text-neutral-300" />
-                              </div>
-                            )}
+                            <img src={getEventImage(event)} alt={event.title} className="w-full h-full object-cover" />
                           </div>
                           <span className="font-serif text-neutral-900 block">{event.title}</span>
                         </div>
@@ -803,6 +866,15 @@ const AdminEvents = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button 
+                            onClick={() => handleDelete(event.id)}
+                            className="text-neutral-400 hover:text-red-600 transition-colors p-2"
+                            title="Delete Event"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

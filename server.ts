@@ -6,7 +6,7 @@ import Stripe from "stripe";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
-import { differenceInDays, parseISO, startOfDay, format } from "date-fns";
+import { differenceInDays, parseISO, startOfDay, format, isBefore } from "date-fns";
 
 dotenv.config();
 //Fix for permission denied
@@ -742,54 +742,94 @@ async function startServer() {
       // 1. Find all bookings for this event
       const bookingsSnap = await db.collection("bookings").where("eventId", "==", eventId).get();
       
+      const eventData = eventSnap.data();
+      const isPast = isBefore(parseISO(eventData.dateTime), new Date());
+
       await db.runTransaction(async (transaction: any) => {
-        // 2. Refund each booking
-        for (const bDoc of bookingsSnap.docs) {
-          const bookingData = bDoc.data();
-          const userRef = db.collection("users").doc(bookingData.userId);
-          const uSnap = await transaction.get(userRef);
-          
-          if (uSnap.exists) {
-            const currentCredits = uSnap.data().credits || 0;
-            transaction.update(userRef, {
-              credits: currentCredits + bookingData.totalCredits
-            });
+        // 2. Refund each booking if event is not in the past
+        if (!isPast) {
+          for (const bDoc of bookingsSnap.docs) {
+            const bookingData = bDoc.data();
+            const userRef = db.collection("users").doc(bookingData.userId);
+            const uSnap = await transaction.get(userRef);
+            
+            if (uSnap.exists) {
+              const currentCredits = uSnap.data().credits || 0;
+              transaction.update(userRef, {
+                credits: currentCredits + bookingData.totalCredits
+              });
 
-            // Add notification
-            const notifRef = db.collection("notifications").doc();
-            transaction.set(notifRef, {
-              userId: bookingData.userId,
-              title: "Event Cancelled",
-              body: `Your reservation for ${eventSnap.data()?.title} has been cancelled as the event was deleted by an admin.`,
-              read: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+              // Add notification
+              const notifRef = db.collection("notifications").doc();
+              transaction.set(notifRef, {
+                userId: bookingData.userId,
+                title: "Event Cancelled",
+                body: `Your reservation for ${eventData.title} has been cancelled as the event was deleted by an admin.`,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
 
-            // Log refund transaction
-            const transRef = db.collection("transactions").doc();
-            transaction.set(transRef, {
-              userId: bookingData.userId,
-              amount: 0,
-              creditsIssued: bookingData.totalCredits,
-              type: "refund",
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              bookingId: bDoc.id,
-              eventId: eventId,
-              reason: "Event deleted by admin"
-            });
+              // Log refund transaction
+              const transRef = db.collection("transactions").doc();
+              transaction.set(transRef, {
+                userId: bookingData.userId,
+                amount: 0,
+                creditsIssued: bookingData.totalCredits,
+                type: "refund",
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                bookingId: bDoc.id,
+                eventId: eventId,
+                reason: "Event deleted by admin"
+              });
+            }
+            
+            // Delete booking
+            transaction.delete(bDoc.ref);
           }
-          
-          // Delete booking
-          transaction.delete(bDoc.ref);
         }
 
         // 3. Delete the event
         transaction.delete(eventRef);
       });
 
-      res.json({ success: true, message: `Event deleted and ${bookingsSnap.size} bookings refunded` });
+      res.json({ success: true, message: `Event deleted${!isPast ? ` and ${bookingsSnap.size} bookings refunded` : ""}` });
     } catch (error: any) {
       console.error("Admin delete-event error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin API: Delete ALL Past Events
+  app.post("/api/admin/delete-all-past-events", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const db = await getDb();
+      const decodedToken = await adminApp!.auth().verifyIdToken(idToken);
+      
+      // Verify caller is admin
+      const callerSnap = await db.collection("users").doc(decodedToken.uid).get();
+      const isAdmin = isUserAdmin(decodedToken, callerSnap);
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      }
+
+      const now = new Date();
+      const eventsSnap = await db.collection("events").get();
+      const pastEvents = eventsSnap.docs.filter(doc => isBefore(parseISO(doc.data().dateTime), now));
+
+      const batch = db.batch();
+      pastEvents.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      res.json({ success: true, message: `Deleted ${pastEvents.length} past events` });
+    } catch (error: any) {
+      console.error("Admin delete-all-past-events error:", error);
       res.status(500).json({ error: error.message });
     }
   });

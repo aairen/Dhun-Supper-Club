@@ -149,6 +149,8 @@ const Events = () => {
               "hands-on": `${import.meta.env.BASE_URL}images/hands_on.jpeg`
             };
             
+            const eventImage = (event.imageUrl && event.imageUrl !== "") ? event.imageUrl : (eventImages[event.type] || eventImages.curated);
+            
             return (
               <motion.div 
                 key={event.id}
@@ -159,7 +161,7 @@ const Events = () => {
               >
                 <div className="aspect-video overflow-hidden relative bg-neutral-100">
                   <img 
-                    src={eventImages[event.type] || eventImages.curated}
+                    src={eventImage}
                     alt={event.title}
                     className={cn(
                       "w-full h-full object-cover group-hover:scale-105 transition-transform duration-700",
