@@ -101,7 +101,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/thali.jpeg`}
+                  src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/thali.jpeg?alt=media&token=3bb5f1a1-e860-49f2-b529-ea30754c03fb"
                   alt="Grand Thali Experience" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -128,7 +128,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/brunch.jpeg`}
+                  src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/brunch.jpeg?alt=media&token=059b839f-8056-4173-9490-fda9e7f78e01"
                   alt="Tiffins & Toast Brunch" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -155,7 +155,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/curated.jpeg`}
+                  src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/curated.jpeg?alt=media&token=a2ec3e8a-0876-490f-b0a8-0ee217b6be05"
                   alt="Curated Dining" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -182,7 +182,7 @@ const Home = () => {
             >
               <div className="aspect-[4/5] overflow-hidden mb-8 bg-neutral-100">
                 <img 
-                  src={`${import.meta.env.BASE_URL}images/hands_on.jpeg`}
+                  src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/hands_on.jpeg?alt=media&token=5422e301-e59f-4e3a-a1ab-1aeaf825c153"
                   alt="Hands-On Cooking" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"

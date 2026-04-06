@@ -143,10 +143,10 @@ const Events = () => {
             
             // Image mapping for event types
             const eventImages = {
-              thali: `${import.meta.env.BASE_URL}images/thali.jpeg`,
-              brunch: `${import.meta.env.BASE_URL}images/brunch.jpeg`,
-              curated: `${import.meta.env.BASE_URL}images/curated.jpeg`,
-              "hands-on": `${import.meta.env.BASE_URL}images/hands_on.jpeg`
+              thali: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/thali.jpeg?alt=media&token=3bb5f1a1-e860-49f2-b529-ea30754c03fb",
+              brunch: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/brunch.jpeg?alt=media&token=059b839f-8056-4173-9490-fda9e7f78e01",
+              curated: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/curated.jpeg?alt=media&token=a2ec3e8a-0876-490f-b0a8-0ee217b6be05",
+              "hands-on": "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/hands_on.jpeg?alt=media&token=5422e301-e59f-4e3a-a1ab-1aeaf825c153"
             };
             
             const eventImage = (event.imageUrl && event.imageUrl !== "") ? event.imageUrl : (eventImages[event.type] || eventImages.curated);

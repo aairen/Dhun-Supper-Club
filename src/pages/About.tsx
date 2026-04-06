@@ -31,7 +31,7 @@ const About = () => {
 
             <div className="aspect-square bg-neutral-100 overflow-hidden my-12 max-w-md mx-auto">
               <img 
-                src={`${import.meta.env.BASE_URL}images/ruchi.jpeg`}
+                src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0247572113.firebasestorage.app/o/ruchi.jpeg?alt=media&token=cf0923d5-8db4-4f1c-90df-161d93ea9237"
                 alt="Founder of Dhun, Ruchi Airen" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
