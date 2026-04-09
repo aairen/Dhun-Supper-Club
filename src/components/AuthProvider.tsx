@@ -62,14 +62,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
             
+            const currentYear = new Date().getFullYear();
+            
+            // Reset membership progress if it's a new year
+            if (data.membershipYear !== currentYear && data.membershipProgress > 0) {
+              await updateDoc(userDocRef, { membershipProgress: 0, membershipYear: currentYear, role: data.role === 'member' ? 'user' : data.role });
+            }
+
             // Membership Auto-Update: Spend 20+ credits -> Member
             if (data.membershipProgress >= 20 && data.role === 'user') {
               try {
-                await updateDoc(userDocRef, { role: 'member' });
+                await updateDoc(userDocRef, { role: 'member', membershipYear: currentYear });
               } catch (err) {
                 console.error("Membership update error:", err);
               }
-            } else if (data.membershipProgress < 20 && data.role === 'member') {
+            } else if (data.role === 'member' && data.membershipYear < currentYear) {
+              // Revert to Guest if membership expired
+              try {
+                await updateDoc(userDocRef, { role: 'user' });
+              } catch (err) {
+                console.error("Membership downgrade error:", err);
+              }
+            } else if (data.membershipProgress < 20 && data.role === 'member' && data.membershipYear === currentYear) {
               // Revert to Guest if progress falls below 20
               try {
                 await updateDoc(userDocRef, { role: 'user' });

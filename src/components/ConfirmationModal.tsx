@@ -6,13 +6,14 @@ import { cn } from "../lib/utils";
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (message?: string) => void;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
   variant?: "danger" | "info" | "success";
   isLoading?: boolean;
+  showAdminMessage?: boolean;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -25,7 +26,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelText = "Cancel",
   variant = "info",
   isLoading = false,
+  showAdminMessage = false,
 }) => {
+  const [adminMessage, setAdminMessage] = React.useState("");
   const variantStyles = {
     danger: {
       icon: <AlertTriangle className="h-5 w-5 text-red-600" />,
@@ -68,9 +71,21 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           {message}
         </p>
         
+        {showAdminMessage && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Admin Message (Optional)</label>
+            <textarea 
+              value={adminMessage}
+              onChange={e => setAdminMessage(e.target.value)}
+              className="w-full bg-neutral-50 border border-neutral-200 px-4 py-3 text-sm focus:outline-none focus:border-neutral-900 transition-colors"
+              placeholder="Add a message for the user..."
+            />
+          </div>
+        )}
+        
         <div className="pt-4 space-y-3">
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(adminMessage)}
             disabled={isLoading}
             className={cn(
               "w-full text-white py-4 text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50",

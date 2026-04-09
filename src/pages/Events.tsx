@@ -62,6 +62,7 @@ const Events = () => {
 
   const filteredEvents = events.filter(event => {
     if (isBefore(parseISO(event.dateTime), new Date())) return false;
+    if (event.published === false) return false;
 
     const status = getAvailabilityStatus(event);
     const isSoldOut = status === "Sold Out";

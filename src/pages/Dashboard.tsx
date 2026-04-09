@@ -5,7 +5,7 @@ import { useAuth } from "../components/AuthProvider";
 import { Booking, DiningEvent } from "../types";
 import { format, parseISO, isAfter, isBefore, addDays, differenceInDays, startOfDay } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
-import { Calendar, CreditCard, Star, Clock, AlertCircle, XCircle, ChevronRight, Users } from "lucide-react";
+import { Calendar, CreditCard, Star, Clock, AlertCircle, XCircle, ChevronRight, Users, Info } from "lucide-react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { generateAutoEvents } from "../lib/eventUtils";
@@ -373,15 +373,20 @@ const Dashboard = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[10px] md:text-xs font-semibold uppercase tracking-widest text-neutral-400 group-hover:text-neutral-900 transition-colors">Membership Status</h3>
-              <Star className={cn("w-4 h-4", profile?.role === 'member' ? "text-amber-500 fill-current" : "text-neutral-900")} />
+              <div className="flex items-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); setShowMembershipModal(true); }} className="text-neutral-400 hover:text-neutral-900">
+                  <Info className="w-4 h-4" />
+                </button>
+                <Star className={cn("w-4 h-4", profile?.role === 'member' ? "text-amber-500 fill-current" : "text-neutral-900")} />
+              </div>
             </div>
             <div className="flex items-end justify-between">
               <span className="text-2xl md:text-3xl font-serif text-neutral-900 uppercase tracking-widest">
                 {profile?.role === 'member' ? 'Member' : 'Guest'}
               </span>
               {profile?.role !== 'member' && (
-                <span className="text-[10px] text-neutral-400 uppercase tracking-widest">
-                  {profile?.membershipProgress || 0} / 20 Credits Spent
+                <span className="text-[10px] text-neutral-400 uppercase tracking-widest text-right">
+                  You need to spend {Math.max(0, 20 - (profile?.membershipProgress || 0))} more credits to become a member.
                 </span>
               )}
             </div>

@@ -679,18 +679,41 @@ async function startServer() {
         return res.status(403).json({ error: "Forbidden: Admin access required" });
       }
 
-      const { targetUserId } = req.body;
-      if (!targetUserId) {
-        return res.status(400).json({ error: "Target User ID is required" });
+      const { targetUserId, newRole } = req.body;
+      if (!targetUserId || !newRole) {
+        return res.status(400).json({ error: "Target User ID and new role are required" });
       }
 
+      let finalRole = newRole;
+      if (newRole === "user") {
+        // Calculate credits spent this year
+        const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+        const transactionsSnap = await db.collection("transactions")
+          .where("userId", "==", targetUserId)
+          .where("type", "==", "booking")
+          .where("timestamp", ">=", startOfYear)
+          .get();
+        
+        let creditsSpent = 0;
+        transactionsSnap.forEach(doc => {
+          const data = doc.data();
+          creditsSpent += Math.abs(data.creditsIssued || 0);
+        });
+        
+        if (creditsSpent >= 20) {
+          finalRole = "member";
+        }
+      }
+
+      const targetUserRef = db.collection("users").doc(targetUserId);
+      
       // Set custom claim
-      await adminApp!.auth().setCustomUserClaims(targetUserId, { admin: true });
+      await adminApp!.auth().setCustomUserClaims(targetUserId, { admin: finalRole === "admin" });
       
       // Update role in Firestore
-      await db.collection("users").doc(targetUserId).update({ role: "admin" });
+      await targetUserRef.update({ role: finalRole });
 
-      res.json({ success: true });
+      res.json({ success: true, role: finalRole });
     } catch (error: any) {
       console.error("Admin set-admin error:", error);
       res.status(500).json({ error: error.message });
@@ -1053,7 +1076,7 @@ async function startServer() {
         transaction.set(notifRef, {
           userId: bookingData.userId,
           title: "Booking Canceled",
-          body: `Your reservation of <b>${eventData?.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> for <b>${bookingData.numPeople} ${bookingData.numPeople === 1 ? "person" : "people"}</b> has been canceled by an <b><span style="color:red">admin</span></b>.`,
+          body: `Your reservation of <b>${eventData?.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> for <b>${bookingData.numPeople} ${bookingData.numPeople === 1 ? "person" : "people"}</b> has been canceled by an <b><span style="color:red">admin</span></b>.${req.body.adminMessage ? `<br><br>Admin Message: ${req.body.adminMessage}` : ''}`,
           read: false,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -1120,7 +1143,7 @@ async function startServer() {
       await db.collection("notifications").add({
         userId: booking.userId,
         title: "Booking Updated",
-        body: `Your reservation of <b>${event.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> has updated to <b>${numPeople} ${numPeople === 1 ? "person" : "people"}</b> by an <b><span style="color:red">admin</span></b>.`,
+        body: `Your reservation of <b>${event.title}</b> on <b>${eventDate}</b> at <b>${eventTime}</b> has updated to <b>${numPeople} ${numPeople === 1 ? "person" : "people"}</b> by an <b><span style="color:red">admin</span></b>.${req.body.adminMessage ? `<br><br>Admin Message: ${req.body.adminMessage}` : ''}`,
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });

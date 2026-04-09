@@ -11,7 +11,6 @@ const Contact = () => {
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     subject: "",
-    email: "",
     body: "",
   });
 
@@ -23,13 +22,13 @@ const Contact = () => {
       await addDoc(collection(db, "messages"), {
         userId: user?.uid || "anonymous",
         subject: formData.subject,
-        email: formData.email,
+        email: user?.email || "anonymous",
         body: formData.body,
         status: "unread",
         createdAt: serverTimestamp(),
       });
       setSuccess(true);
-      setFormData({ subject: "", email: "", body: "" });
+      setFormData({ subject: "", body: "" });
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -103,7 +102,7 @@ const Contact = () => {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-6">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Subject</label>
                       <input
@@ -113,17 +112,6 @@ const Contact = () => {
                         placeholder="How can we help you?"
                         value={formData.subject}
                         onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        className="w-full px-4 py-3 border border-neutral-200 focus:border-neutral-900 outline-none transition-all text-sm"
-                        placeholder="your@email.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
                     </div>
                   </div>

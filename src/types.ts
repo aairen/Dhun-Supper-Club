@@ -27,6 +27,7 @@ export interface DiningEvent {
   creditsPerPerson: number;
   bookedSeats: number;
   imageUrl?: string;
+  published?: boolean;
 }
 
 export interface Booking {

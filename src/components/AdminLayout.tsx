@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Calendar, 
-  Users, 
+  ClipboardList, 
   Users2, 
   DollarSign, 
   MessageSquare,
@@ -17,7 +17,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const adminLinks = [
     { name: "Overview", path: "/admin", icon: LayoutDashboard },
     { name: "Events", path: "/admin/events", icon: Calendar },
-    { name: "Bookings", path: "/admin/bookings", icon: Users },
+    { name: "Bookings", path: "/admin/bookings", icon: ClipboardList },
     { name: "Users", path: "/admin/users", icon: Users2 },
     { name: "Revenue", path: "/admin/revenue", icon: DollarSign },
     { name: "Messages", path: "/admin/messages", icon: MessageSquare },

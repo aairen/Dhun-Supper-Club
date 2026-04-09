@@ -4,7 +4,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../../firebase";
 import { DiningEvent } from "../../types";
 import { format, parseISO, addDays, startOfMonth, isBefore } from "date-fns";
-import { Plus, Trash2, Calendar, Clock, Users, DollarSign, X, Image as ImageIcon, Upload, ChevronUp, ChevronDown, RefreshCw, Database, Eraser, Pencil } from "lucide-react";
+import { Plus, Trash2, Calendar, Clock, Users, DollarSign, X, Image as ImageIcon, Upload, ChevronUp, ChevronDown, RefreshCw, Database, Eraser, Pencil, Eye, EyeOff } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 import { generateAutoEvents } from "../../lib/eventUtils";
@@ -24,7 +24,7 @@ const AdminEvents = () => {
   const [populating, setPopulating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "dateTime", direction: "desc" });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "dateTime", direction: "asc" });
 
   const [showClearModal, setShowClearModal] = useState(false);
   const [showPopulateModal, setShowPopulateModal] = useState(false);
@@ -47,6 +47,7 @@ const AdminEvents = () => {
     type: "curated" as DiningEvent["type"],
     creditsPerPerson: 1,
     imageUrl: "",
+    published: false,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -241,6 +242,7 @@ const AdminEvents = () => {
           ...eventData,
           createdAt: new Date().toISOString(),
           imageUrl: "",
+          published: false,
         });
       });
       
@@ -311,6 +313,7 @@ const AdminEvents = () => {
         type: "curated",
         creditsPerPerson: 1,
         imageUrl: "",
+        published: false,
       });
       setEditingEvent(null);
       setImageFile(null);
@@ -333,9 +336,20 @@ const AdminEvents = () => {
       type: event.type,
       creditsPerPerson: event.creditsPerPerson,
       imageUrl: event.imageUrl || "",
+      published: event.published || false,
     });
     setImagePreview(getEventImage(event));
     setShowAdd(true);
+  };
+
+  const togglePublish = async (event: DiningEvent) => {
+    try {
+      await updateDoc(doc(db, "events", event.id), {
+        published: !event.published
+      });
+    } catch (err) {
+      console.error("Error toggling publish status:", err);
+    }
   };
 
   const handleDelete = async (eventId: string) => {
@@ -345,6 +359,9 @@ const AdminEvents = () => {
 
   const confirmDelete = async () => {
     if (!eventToDelete) return;
+    const event = events.find(e => e.id === eventToDelete);
+    const isPast = event ? isBefore(parseISO(event.dateTime), new Date()) : false;
+    
     setShowDeleteModal(false);
     setLoading(true);
     try {
@@ -369,7 +386,7 @@ const AdminEvents = () => {
       setAlertConfig({
         isOpen: true,
         title: "Success",
-        message: "Event deleted and bookings refunded successfully.",
+        message: isPast ? "Event deleted. No refunds were issued." : "Event deleted and bookings refunded successfully.",
         variant: "success",
       });
     } catch (err: any) {
@@ -568,6 +585,25 @@ const AdminEvents = () => {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Published</label>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, published: !formData.published})}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-colors flex items-center px-1",
+                        formData.published ? "bg-green-600 justify-end" : "bg-neutral-200 justify-start"
+                      )}
+                    >
+                      <div className="w-4 h-4 bg-white rounded-full" />
+                    </button>
+                    <span className="ml-3 text-sm font-bold uppercase tracking-widest text-neutral-900">
+                      {formData.published ? "Published" : "Unpublished"}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Event Picture</label>
                   <div className="flex items-center space-x-4">
@@ -622,19 +658,29 @@ const AdminEvents = () => {
 
       <div className="bg-white border border-neutral-200 shadow-sm overflow-hidden">
         {/* Mobile Card Layout */}
-        <div className="md:hidden divide-y divide-neutral-100">
+        <div className="md:hidden divide-y divide-neutral-100 w-full">
           {activeEvents.length > 0 ? (
             activeEvents.map(event => (
               <div key={event.id} className="p-4 space-y-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full">
                   <div className="w-12 h-12 bg-neutral-100 border border-neutral-200 flex-shrink-0 overflow-hidden">
                     <img src={getEventImage(event)} alt={event.title} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0 cursor-pointer hover:text-neutral-600" onClick={() => handleEdit(event)}>
-                    <div className="font-serif text-neutral-900 truncate">{event.title}</div>
+                    <div className="font-serif text-neutral-900 text-sm truncate">{event.title}</div>
                     <div className="text-[10px] text-neutral-400 uppercase tracking-widest">{event.type}</div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => togglePublish(event)}
+                      className={cn(
+                        "p-2 transition-colors",
+                        event.published ? "text-green-600 hover:text-green-800" : "text-neutral-400 hover:text-neutral-900"
+                      )}
+                      title={event.published ? "Unpublish Event" : "Publish Event"}
+                    >
+                      {event.published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
                     <button 
                       onClick={() => handleEdit(event)}
                       className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"
@@ -802,6 +848,16 @@ const AdminEvents = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
+                      <button 
+                        onClick={() => togglePublish(event)}
+                        className={cn(
+                          "p-2 transition-colors",
+                          event.published ? "text-green-600 hover:text-green-800" : "text-neutral-400 hover:text-neutral-900"
+                        )}
+                        title={event.published ? "Unpublish Event" : "Publish Event"}
+                      >
+                        {event.published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
                       <button 
                         onClick={() => handleEdit(event)}
                         className="text-neutral-400 hover:text-neutral-900 transition-colors p-2"

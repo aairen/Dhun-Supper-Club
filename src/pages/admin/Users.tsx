@@ -67,7 +67,7 @@ const AdminUsers = () => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({ targetUserId: targetUid })
+        body: JSON.stringify({ targetUserId: targetUid, newRole: newRole })
       });
 
       if (!response.ok) {

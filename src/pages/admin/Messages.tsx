@@ -23,8 +23,6 @@ const AdminMessages = () => {
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
 
   const sortedMessages = [...messages].sort((a, b) => {
-    if (a.email !== b.email) return a.email.localeCompare(b.email);
-    if (a.subject !== b.subject) return a.subject.localeCompare(b.subject);
     const dateA = a.createdAt?.toDate() || new Date(0);
     const dateB = b.createdAt?.toDate() || new Date(0);
     return dateB.getTime() - dateA.getTime();
