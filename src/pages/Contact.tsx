@@ -19,6 +19,17 @@ const Contact = () => {
     setLoading(true);
     
     try {
+      // Send email
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: user?.displayName || "Anonymous",
+          email: user?.email || "anonymous",
+          message: formData.body,
+        }),
+      });
+
       await addDoc(collection(db, "messages"), {
         userId: user?.uid || "anonymous",
         subject: formData.subject,

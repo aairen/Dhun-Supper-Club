@@ -7,10 +7,108 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { differenceInDays, parseISO, startOfDay, format, isBefore } from "date-fns";
+import { Resend } from "resend";
 
 dotenv.config();
 //Fix for permission denied
 const serviceAccountKey = JSON.parse(process.env.FIREBASE_ADMIN_SDK_KEY || '{}');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const EMAIL_FROM = process.env.EMAIL_FROM || "noreply@example.com";
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || "contact@example.com";
+// Helper to send emails
+async function sendEmail(to: string, subject: string, html: string) {
+  try {
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject,
+      html,
+    });
+  } catch (error) {
+    console.error(`[EMAIL ERROR] Failed to send email to ${to}:`, error);
+  }
+}
+
+// Email Templates
+const getBaseEmailTemplate = (content: string) => `
+<div style="background-color: #0a0a0a; color: #e5e5e5; font-family: 'Georgia', serif; padding: 40px; border: 1px solid #333;">
+  <h1 style="color: #d4af37; font-size: 24px;">Luxury Supper Club</h1>
+  <div style="margin-top: 20px;">
+    ${content}
+  </div>
+  <p style="margin-top: 40px; font-size: 12px; color: #737373;">&copy; 2026 Luxury Supper Club. All rights reserved.</p>
+</div>
+`;
+
+const getBookingConfirmationEmail = (title: string, dateTime: string, numPeople: number, creditsSpent: number, bookingId: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Booking Confirmed</h2>
+  <p>We are delighted to confirm your reservation for <strong>${title}</strong>.</p>
+  <ul style="list-style-type: none; padding: 0;">
+    <li><strong>Date/Time:</strong> ${dateTime}</li>
+    <li><strong>Guests:</strong> ${numPeople}</li>
+    <li><strong>Credits Spent:</strong> ${creditsSpent}</li>
+  </ul>
+  <p><a href="${process.env.APP_URL}/#/reservation/${bookingId}" style="color: #d4af37; text-decoration: underline;">View your reservation</a></p>
+`);
+
+const getBookingCancellationEmail = (title: string, dateTime: string, numPeople: number, creditsRefunded: number, adminMessage?: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Booking Cancelled</h2>
+  <p>Your reservation for <strong>${title}</strong> has been cancelled.</p>
+  <ul style="list-style-type: none; padding: 0;">
+    <li><strong>Date/Time:</strong> ${dateTime}</li>
+    <li><strong>Guests:</strong> ${numPeople}</li>
+    <li><strong>Credits Refunded:</strong> ${creditsRefunded}</li>
+  </ul>
+  ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ""}
+`);
+
+const getBookingEditEmail = (title: string, dateTime: string, numPeople: number, creditsRefunded: number, adminMessage?: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Booking Updated</h2>
+  <p>Your reservation for <strong>${title}</strong> has been updated.</p>
+  <ul style="list-style-type: none; padding: 0;">
+    <li><strong>Date/Time:</strong> ${dateTime}</li>
+    <li><strong>Guests:</strong> ${numPeople}</li>
+    <li><strong>Credits Refunded (if applicable):</strong> ${creditsRefunded}</li>
+  </ul>
+  ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ""}
+`);
+
+const getEventReminderEmail = (title: string, dateTime: string, numPeople: number, bookingId: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Event Reminder</h2>
+  <p>We are looking forward to seeing you at <strong>${title}</strong>.</p>
+  <ul style="list-style-type: none; padding: 0;">
+    <li><strong>Date/Time:</strong> ${dateTime}</li>
+    <li><strong>Guests:</strong> ${numPeople}</li>
+  </ul>
+  <p><a href="${process.env.APP_URL}/#/reservation/${bookingId}" style="color: #d4af37; text-decoration: underline;">View your reservation</a></p>
+`);
+
+const getContactFormEmail = (name: string, email: string, message: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">New Contact Form Message</h2>
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Email:</strong> ${email}</p>
+  <p><strong>Message:</strong></p>
+  <p>${message}</p>
+`);
+
+const getAccountCreatedEmail = (name: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Welcome to Dhun Supper Club</h2>
+  <p>Hello ${name},</p>
+  <p>Your account has been successfully created. We are delighted to have you as part of our community.</p>
+`);
+
+const getPasswordChangedEmail = (name: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Password Changed</h2>
+  <p>Hello ${name},</p>
+  <p>Your password has been successfully updated. If you did not make this change, please contact us immediately.</p>
+`);
+
+const getAccountDeletedEmail = (name: string) => getBaseEmailTemplate(`
+  <h2 style="color: #ffffff;">Account Deleted</h2>
+  <p>Hello ${name},</p>
+  <p>Your account has been successfully deleted. We are sorry to see you go.</p>
+`);
 
 // Log environment variables for debugging (redacted for security where appropriate)
 console.log("[ENV CHECK] VITE_FIREBASE_PROJECT_ID:", process.env.VITE_FIREBASE_PROJECT_ID || "Not Set");
@@ -394,7 +492,26 @@ async function startServer() {
           bookingId: bookingRef.id,
           eventId
         });
+        
+        // Store these for use outside the transaction
+        (req as any).bookingId = bookingRef.id;
+        (req as any).totalCredits = totalCredits;
       });
+      
+      // Send confirmation email
+      const userSnap = await db.collection("users").doc(decodedToken.uid).get();
+      const userEmail = userSnap.data()?.email;
+      const eventSnap = await db.collection("events").doc(eventId).get();
+      const eventDataFromSnap = eventSnap.data();
+      
+      if (userEmail && eventDataFromSnap) {
+        const dateTime = format(parseISO(eventDataFromSnap.dateTime), "MMM dd, yyyy h:mm a");
+        sendEmail(
+          userEmail,
+          "Booking Confirmed",
+          getBookingConfirmationEmail(eventDataFromSnap.title, dateTime, numPeople, (req as any).totalCredits, (req as any).bookingId)
+        );
+      }
       
       res.json({ success: true });
     } catch (error: any) {
@@ -467,6 +584,16 @@ async function startServer() {
 
         if (shouldSend) {
           console.log(`[REMINDER SENT] To: ${user.email}, Event: ${event.title}, Timeframe: ${timeFrame}`);
+          
+          // Send reminder email
+          if (user.email) {
+            const dateTime = format(parseISO(event.dateTime), "MMM dd, yyyy h:mm a");
+            sendEmail(
+              user.email,
+              `Event Reminder: ${event.title}`,
+              getEventReminderEmail(event.title, dateTime, booking.numPeople, bookingId)
+            );
+          }
           
           // Update booking
           await db.collection("bookings").doc(bookingId).update({
@@ -1081,6 +1208,21 @@ async function startServer() {
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       });
+      
+      // Send cancellation email
+      const userSnap = await db.collection("users").doc(bookingData.userId).get();
+      const userEmail = userSnap.data()?.email;
+      const eventSnap = await db.collection("events").doc(bookingData.eventId).get();
+      const eventData = eventSnap.data();
+      
+      if (userEmail && eventData) {
+        const dateTime = format(parseISO(eventData.dateTime), "MMM dd, yyyy h:mm a");
+        sendEmail(
+          userEmail,
+          "Booking Cancelled",
+          getBookingCancellationEmail(eventData.title, dateTime, bookingData.numPeople, bookingData.totalCredits, req.body.adminMessage)
+        );
+      }
 
       res.json({ success: true, message: "Booking cancelled and credits refunded" });
     } catch (error: any) {
@@ -1147,9 +1289,72 @@ async function startServer() {
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      
+      // Send edit email
+      const userSnap = await db.collection("users").doc(booking.userId).get();
+      const userEmail = userSnap.data()?.email;
+      
+      if (userEmail) {
+        const dateTime = format(parseISO(event.dateTime), "MMM dd, yyyy h:mm a");
+        sendEmail(
+          userEmail,
+          "Booking Updated",
+          getBookingEditEmail(event.title, dateTime, numPeople, creditDifference, req.body.adminMessage)
+        );
+      }
 
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const { name, email, message } = req.body;
+      
+      await sendEmail(
+        CONTACT_EMAIL,
+        "New Contact Form Message",
+        getContactFormEmail(name, email, message)
+      );
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Contact form error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/account-created", async (req, res) => {
+    try {
+      const { name, email } = req.body;
+      await sendEmail(email, "Welcome to Dhun Supper Club", getAccountCreatedEmail(name));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Account created email error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/password-changed", async (req, res) => {
+    try {
+      const { name, email } = req.body;
+      await sendEmail(email, "Password Changed", getPasswordChangedEmail(name));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Password changed email error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/account-deleted", async (req, res) => {
+    try {
+      const { name, email } = req.body;
+      await sendEmail(email, "Account Deleted", getAccountDeletedEmail(name));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Account deleted email error:", error);
       res.status(500).json({ error: error.message });
     }
   });

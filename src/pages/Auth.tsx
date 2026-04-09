@@ -62,13 +62,18 @@ const AuthPage = () => {
           });
 
           // Send welcome email
-          const template = emailTemplates.welcome(fName);
-          await sendEmail({
-            to: user.email || "",
-            subject: template.subject,
-            body: template.body,
-            type: "welcome",
-          });
+          try {
+            await fetch("/api/auth/account-created", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: fName,
+                email: user.email,
+              }),
+            });
+          } catch (err) {
+            console.error("Error sending welcome email:", err);
+          }
           navigate("/dashboard");
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
@@ -140,13 +145,18 @@ const AuthPage = () => {
           });
 
           // Send welcome email
-          const template = emailTemplates.welcome(formData.firstName);
-          await sendEmail({
-            to: user.email || "",
-            subject: template.subject,
-            body: template.body,
-            type: "welcome",
-          });
+          try {
+            await fetch("/api/auth/account-created", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: formData.firstName,
+                email: user.email,
+              }),
+            });
+          } catch (err) {
+            console.error("Error sending welcome email:", err);
+          }
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
         }

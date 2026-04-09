@@ -104,6 +104,20 @@ const SettingsPage = () => {
       await updatePassword(user, passwordData.new);
       setPasswordData({ current: "", new: "", confirm: "" });
       setSuccess("Password updated successfully");
+      
+      // Send password changed email
+      try {
+        await fetch("/api/auth/password-changed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: profile?.firstName || "User",
+            email: user.email,
+          }),
+        });
+      } catch (err) {
+        console.error("Error sending password changed email:", err);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -166,6 +180,20 @@ const SettingsPage = () => {
 
       // 3. Delete from Auth
       await deleteUser(user);
+      
+      // Send account deleted email
+      try {
+        await fetch("/api/auth/account-deleted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: profile?.firstName || "User",
+            email: user.email,
+          }),
+        });
+      } catch (err) {
+        console.error("Error sending account deleted email:", err);
+      }
       
       // 4. Explicit logout
       await auth.signOut();
