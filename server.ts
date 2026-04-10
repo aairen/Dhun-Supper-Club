@@ -27,17 +27,17 @@ async function sendEmail(to: string, subject: string, html: string) {
     });
   } catch (error) {
     console.error(`[EMAIL ERROR] Failed to send email to ${to}:`, error);
+    throw error; // Re-throw to inform the caller
   }
 }
 
 // Email Templates
 const getBaseEmailTemplate = (content: string) => `
-<div style="background-color: #0a0a0a; color: #e5e5e5; font-family: 'Georgia', serif; padding: 40px; border: 1px solid #333;">
-  <h1 style="color: #d4af37; font-size: 24px;">Luxury Supper Club</h1>
+<div style="background-color: #ffffff; color: #171717; font-family: 'Inter', sans-serif; padding: 40px; border: 1px solid #e5e5e5; max-width: 600px; margin: 0 auto;">
   <div style="margin-top: 20px;">
     ${content}
   </div>
-  <p style="margin-top: 40px; font-size: 12px; color: #737373;">&copy; 2026 Luxury Supper Club. All rights reserved.</p>
+  <p style="margin-top: 40px; font-size: 12px; color: #737373; text-align: center;">&copy; 2026 Dhun Supper Club. All rights reserved.</p>
 </div>
 `;
 
