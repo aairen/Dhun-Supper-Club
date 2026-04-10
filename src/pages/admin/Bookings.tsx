@@ -52,7 +52,7 @@ const AdminBookings = () => {
           ...booking,
           userEmail: userSnap.exists() ? (userSnap.data() as UserProfile).email : "Unknown User",
           eventTitle: eventSnap.exists() ? (eventSnap.data() as DiningEvent).title : "Unknown Event",
-          event: eventSnap.exists() ? (eventSnap.data() as DiningEvent) : null
+          event: eventSnap.exists() ? ({ id: eventSnap.id, ...eventSnap.data() } as DiningEvent) : null
         };
       }));
       
