@@ -33,59 +33,75 @@ async function sendEmail(to: string, subject: string, html: string) {
 
 // Email Templates
 const getBaseEmailTemplate = (content: string) => `
-<div style="background-color: #ffffff; color: #171717; font-family: 'Inter', sans-serif; padding: 40px; border: 1px solid #e5e5e5; max-width: 600px; margin: 0 auto;">
-  <div style="margin-top: 20px;">
-    ${content}
-  </div>
-  <p style="margin-top: 40px; font-size: 12px; color: #737373; text-align: center;">&copy; 2026 Dhun Supper Club. All rights reserved.</p>
+<div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; color: #171717;">
+  ${content}
 </div>
 `;
 
 const getBookingConfirmationEmail = (title: string, dateTime: string, numPeople: number, creditsSpent: number, bookingId: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Booking Confirmed</h2>
-  <p>We are delighted to confirm your reservation for <strong>${title}</strong>.</p>
-  <ul style="list-style-type: none; padding: 0;">
-    <li><strong>Date/Time:</strong> ${dateTime}</li>
-    <li><strong>Guests:</strong> ${numPeople}</li>
-    <li><strong>Credits Spent:</strong> ${creditsSpent}</li>
-  </ul>
-  <p><a href="${process.env.APP_URL}/#/reservation/${bookingId}" style="color: #d4af37; text-decoration: underline;">View your reservation</a></p>
+  <h1 style="text-align: center; letter-spacing: 0.1em; font-size: 24px; font-family: serif; text-transform: uppercase;">RESERVATION CONFIRMED</h1>
+  <p>Hello Arjun,</p>
+  <p>Your reservation for <strong>${title}</strong> has been successfully confirmed.</p>
+  <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0;">
+    <p style="font-size: 12px; font-weight: bold; color: #737373; letter-spacing: 0.05em; margin-bottom: 10px; font-family: sans-serif;">DETAILS</p>
+    <p><strong>Date & Time:</strong> ${dateTime}</p>
+    <p><strong>Guests:</strong> ${numPeople}</p>
+    <p><strong>Credits Used:</strong> ${creditsSpent}</p>
+  </div>
+  <p>We look forward to hosting you soon. If you need to cancel or modify your reservation, please do so via your dashboard at least 14 days prior to the event.</p>
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="https://www.dhunsupperclub.com/#/dashboard" style="background-color: #171717; color: #ffffff; padding: 15px 30px; text-decoration: none; font-weight: bold; letter-spacing: 0.05em; display: inline-block; font-family: sans-serif;">VIEW DASHBOARD</a>
+  </div>
 `);
 
 const getBookingCancellationEmail = (title: string, dateTime: string, numPeople: number, creditsRefunded: number, adminMessage?: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Booking Cancelled</h2>
+  <h1 style="text-align: center; letter-spacing: 0.1em; font-size: 24px; font-family: serif; text-transform: uppercase;">RESERVATION CANCELLED</h1>
+  <p>Hello Arjun,</p>
   <p>Your reservation for <strong>${title}</strong> has been cancelled.</p>
-  <ul style="list-style-type: none; padding: 0;">
-    <li><strong>Date/Time:</strong> ${dateTime}</li>
-    <li><strong>Guests:</strong> ${numPeople}</li>
-    <li><strong>Credits Refunded:</strong> ${creditsRefunded}</li>
-  </ul>
+  <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0;">
+    <p style="font-size: 12px; font-weight: bold; color: #737373; letter-spacing: 0.05em; margin-bottom: 10px; font-family: sans-serif;">DETAILS</p>
+    <p><strong>Date & Time:</strong> ${dateTime}</p>
+    <p><strong>Guests:</strong> ${numPeople}</p>
+    <p><strong>Credits Refunded:</strong> ${creditsRefunded}</p>
+  </div>
   ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ""}
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="https://www.dhunsupperclub.com/#/dashboard" style="background-color: #171717; color: #ffffff; padding: 15px 30px; text-decoration: none; font-weight: bold; letter-spacing: 0.05em; display: inline-block; font-family: sans-serif;">VIEW DASHBOARD</a>
+  </div>
 `);
 
 const getBookingEditEmail = (title: string, dateTime: string, numPeople: number, creditsRefunded: number, adminMessage?: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Booking Updated</h2>
+  <h1 style="text-align: center; letter-spacing: 0.1em; font-size: 24px; font-family: serif; text-transform: uppercase;">RESERVATION UPDATED</h1>
+  <p>Hello Arjun,</p>
   <p>Your reservation for <strong>${title}</strong> has been updated.</p>
-  <ul style="list-style-type: none; padding: 0;">
-    <li><strong>Date/Time:</strong> ${dateTime}</li>
-    <li><strong>Guests:</strong> ${numPeople}</li>
-    <li><strong>Credits Refunded (if applicable):</strong> ${creditsRefunded}</li>
-  </ul>
+  <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0;">
+    <p style="font-size: 12px; font-weight: bold; color: #737373; letter-spacing: 0.05em; margin-bottom: 10px; font-family: sans-serif;">DETAILS</p>
+    <p><strong>Date & Time:</strong> ${dateTime}</p>
+    <p><strong>Guests:</strong> ${numPeople}</p>
+    <p><strong>Credits Refunded (if applicable):</strong> ${creditsRefunded}</p>
+  </div>
   ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ""}
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="https://www.dhunsupperclub.com/#/dashboard" style="background-color: #171717; color: #ffffff; padding: 15px 30px; text-decoration: none; font-weight: bold; letter-spacing: 0.05em; display: inline-block; font-family: sans-serif;">VIEW DASHBOARD</a>
+  </div>
 `);
 
 const getEventReminderEmail = (title: string, dateTime: string, numPeople: number, bookingId: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Event Reminder</h2>
+  <h1 style="text-align: center; letter-spacing: 0.1em; font-size: 24px; font-family: serif; text-transform: uppercase;">EVENT REMINDER</h1>
+  <p>Hello Arjun,</p>
   <p>We are looking forward to seeing you at <strong>${title}</strong>.</p>
-  <ul style="list-style-type: none; padding: 0;">
-    <li><strong>Date/Time:</strong> ${dateTime}</li>
-    <li><strong>Guests:</strong> ${numPeople}</li>
-  </ul>
-  <p><a href="${process.env.APP_URL}/#/reservation/${bookingId}" style="color: #d4af37; text-decoration: underline;">View your reservation</a></p>
+  <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0;">
+    <p style="font-size: 12px; font-weight: bold; color: #737373; letter-spacing: 0.05em; margin-bottom: 10px; font-family: sans-serif;">DETAILS</p>
+    <p><strong>Date & Time:</strong> ${dateTime}</p>
+    <p><strong>Guests:</strong> ${numPeople}</p>
+  </div>
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="https://www.dhunsupperclub.com/#/reservation/${bookingId}" style="background-color: #171717; color: #ffffff; padding: 15px 30px; text-decoration: none; font-weight: bold; letter-spacing: 0.05em; display: inline-block; font-family: sans-serif;">VIEW RESERVATION</a>
+  </div>
 `);
 
 const getContactFormEmail = (name: string, email: string, message: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">New Contact Form Message</h2>
+  <h2>New Contact Form Message</h2>
   <p><strong>Name:</strong> ${name}</p>
   <p><strong>Email:</strong> ${email}</p>
   <p><strong>Message:</strong></p>
@@ -93,19 +109,20 @@ const getContactFormEmail = (name: string, email: string, message: string) => ge
 `);
 
 const getAccountCreatedEmail = (name: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Welcome to Dhun Supper Club</h2>
+  <h1 style="text-align: center; letter-spacing: 0.1em; font-size: 24px; font-family: serif; text-transform: uppercase;">WELCOME</h1>
   <p>Hello ${name},</p>
   <p>Your account has been successfully created. We are delighted to have you as part of our community.</p>
+  <p><a href="https://www.dhunsupperclub.com" style="background-color: #171717; color: #ffffff; padding: 10px 20px; text-decoration: none; display: inline-block; font-family: sans-serif;">Explore</a></p>
 `);
 
 const getPasswordChangedEmail = (name: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Password Changed</h2>
+  <h2>Password Changed</h2>
   <p>Hello ${name},</p>
   <p>Your password has been successfully updated. If you did not make this change, please contact us immediately.</p>
 `);
 
 const getAccountDeletedEmail = (name: string) => getBaseEmailTemplate(`
-  <h2 style="color: #ffffff;">Account Deleted</h2>
+  <h2>Account Deleted</h2>
   <p>Hello ${name},</p>
   <p>Your account has been successfully deleted. We are sorry to see you go.</p>
 `);
